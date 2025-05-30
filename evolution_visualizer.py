@@ -5,46 +5,116 @@ import math
 import datetime
 import os
 import csv
+import argparse # Import argparse
 
-# --- 1. Constants and Configuration ---
-WIDTH, HEIGHT = 1000, 700
-FPS = 60
+# --- 1. Constants and Configuration (Now with defaults that can be overridden) ---
+# Define default values for your constants. These will be used if no command-line arguments are provided.
+DEFAULT_WIDTH, DEFAULT_HEIGHT = 1000, 700
+DEFAULT_FPS = 60
 
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-BACKGROUND_COLOR = (20, 20, 30)
-FOOD_COLOR = (100, 255, 100)
-FOOD_RADIUS = 3
+DEFAULT_WHITE = (255, 255, 255)
+DEFAULT_BLACK = (0, 0, 0)
+DEFAULT_BACKGROUND_COLOR = (20, 20, 30)
+DEFAULT_FOOD_COLOR = (100, 255, 100)
+DEFAULT_FOOD_RADIUS = 3
 
-CREATURE_RADIUS = 5
-INITIAL_CREATURE_COUNT = 50 # <-- This must be defined here!
-CREATURE_ENERGY_DECAY = 0.05
-FOOD_ENERGY_GAIN = 40
-MAX_FOOD_COUNT = 500
+DEFAULT_CREATURE_RADIUS = 5
+DEFAULT_INITIAL_CREATURE_COUNT = 50
+DEFAULT_CREATURE_ENERGY_DECAY = 0.05
+DEFAULT_FOOD_ENERGY_GAIN = 40
+DEFAULT_MAX_FOOD_COUNT = 500
 
-MUTATION_CHANCE = 0.02             # Overall chance for a weight/bias to mutate (lower for NN)
-NN_MUTATION_AMOUNT = 0.1          # How much a NN gene (weight/bias) can change
-COLOR_MUTATION_AMOUNT = 30        # For visual variation
+DEFAULT_MUTATION_CHANCE = 0.02
+DEFAULT_NN_MUTATION_AMOUNT = 0.1
+DEFAULT_COLOR_MUTATION_AMOUNT = 30
 
-# --- Neural Network Architecture Constants ---
-NN_INPUT_NODES = 3  # Energy, Dist to Food, Angle to Food
-NN_HIDDEN_NODES = 4 # One hidden layer
-NN_OUTPUT_NODES = 1 # Steering force (-1 to 1)
+# Neural Network Architecture Constants (these are usually fixed per model)
+NN_INPUT_NODES = 3
+NN_HIDDEN_NODES = 4
+NN_OUTPUT_NODES = 1
 
-# --- Generation Control ---
-GENERATION_LENGTH_FRAMES = 5000 # How many frames before a new generation cycle (time-based)
-SELECTION_PERCENTAGE = 0.3      # Top 30% of creatures get to breed
-CREATURE_MAX_ENERGY = 100       # Maximum energy for a creature
+# Generation Control Defaults
+DEFAULT_GENERATION_LENGTH_FRAMES = 5000
+DEFAULT_SELECTION_PERCENTAGE = 0.3
+DEFAULT_CREATURE_MAX_ENERGY = 100
 
-# --- Generation End Metric ---
-FOOD_LIMIT_PER_GENERATION = 500 # A new generation starts when this many food items are consumed in the current generation
+# Generation End Metric Defaults
+DEFAULT_FOOD_LIMIT_PER_GENERATION = 500
 
-# --- Logging Configuration ---
-LOG_DIRECTORY = "simulation_logs"
-LOG_ENABLED = True # Set to False to disable logging
-# FIXED LOG FILE NAME - this file will be overwritten on each run
-LIVE_LOG_FILE_NAME = "evolution_live_log.csv"
+# Logging Configuration Defaults
+DEFAULT_LOG_DIRECTORY = "simulation_logs"
+DEFAULT_LOG_ENABLED = True
+DEFAULT_LIVE_LOG_FILE_NAME = "evolution_live_log.csv"
+
+# --- Argument Parsing ---
+parser = argparse.ArgumentParser(description="Evolution Simulator (Pygame).")
+
+parser.add_argument('--width', type=int, default=DEFAULT_WIDTH, help=f"Window width (default: {DEFAULT_WIDTH})")
+parser.add_argument('--height', type=int, default=DEFAULT_HEIGHT, help=f"Window height (default: {DEFAULT_HEIGHT})")
+parser.add_argument('--fps', type=int, default=DEFAULT_FPS, help=f"Frames per second (default: {DEFAULT_FPS})")
+
+parser.add_argument('--initial_creature_count', type=int, default=DEFAULT_INITIAL_CREATURE_COUNT,
+                    help=f"Initial number of creatures (default: {DEFAULT_INITIAL_CREATURE_COUNT})")
+parser.add_argument('--creature_energy_decay', type=float, default=DEFAULT_CREATURE_ENERGY_DECAY,
+                    help=f"Energy decay per frame (default: {DEFAULT_CREATURE_ENERGY_DECAY})")
+parser.add_argument('--food_energy_gain', type=float, default=DEFAULT_FOOD_ENERGY_GAIN,
+                    help=f"Energy gained from food (default: {DEFAULT_FOOD_ENERGY_GAIN})")
+parser.add_argument('--max_food_count', type=int, default=DEFAULT_MAX_FOOD_COUNT,
+                    help=f"Maximum food items in world (default: {DEFAULT_MAX_FOOD_COUNT})")
+
+parser.add_argument('--mutation_chance', type=float, default=DEFAULT_MUTATION_CHANCE,
+                    help=f"Chance for a gene to mutate (0-1) (default: {DEFAULT_MUTATION_CHANCE})")
+parser.add_argument('--nn_mutation_amount', type=float, default=DEFAULT_NN_MUTATION_AMOUNT,
+                    help=f"Amount NN weights/biases can change during mutation (default: {DEFAULT_NN_MUTATION_AMOUNT})")
+parser.add_argument('--color_mutation_amount', type=int, default=DEFAULT_COLOR_MUTATION_AMOUNT,
+                    help=f"Amount creature color can change during mutation (default: {DEFAULT_COLOR_MUTATION_AMOUNT})")
+
+parser.add_argument('--generation_length_frames', type=int, default=DEFAULT_GENERATION_LENGTH_FRAMES,
+                    help=f"Frames per generation (default: {DEFAULT_GENERATION_LENGTH_FRAMES})")
+parser.add_argument('--selection_percentage', type=float, default=DEFAULT_SELECTION_PERCENTAGE,
+                    help=f"Top percentage of creatures to breed (0-1) (default: {DEFAULT_SELECTION_PERCENTAGE})")
+parser.add_argument('--creature_max_energy', type=float, default=DEFAULT_CREATURE_MAX_ENERGY,
+                    help=f"Maximum energy for a creature (default: {DEFAULT_CREATURE_MAX_ENERGY})")
+
+parser.add_argument('--food_limit_per_generation', type=int, default=DEFAULT_FOOD_LIMIT_PER_GENERATION,
+                    help=f"Food items consumed to end generation early (default: {DEFAULT_FOOD_LIMIT_PER_GENERATION})")
+
+parser.add_argument('--log_enabled', type=int, default=int(DEFAULT_LOG_ENABLED),
+                    help=f"Enable logging (0=False, 1=True) (default: {int(DEFAULT_LOG_ENABLED)})")
+
+args = parser.parse_args()
+
+# --- Assign values from parsed arguments to constants ---
+WIDTH, HEIGHT = args.width, args.height
+FPS = args.fps
+
+WHITE = DEFAULT_WHITE
+BLACK = DEFAULT_BLACK
+BACKGROUND_COLOR = DEFAULT_BACKGROUND_COLOR
+FOOD_COLOR = DEFAULT_FOOD_COLOR
+FOOD_RADIUS = DEFAULT_FOOD_RADIUS
+
+CREATURE_RADIUS = DEFAULT_CREATURE_RADIUS
+INITIAL_CREATURE_COUNT = args.initial_creature_count # This now takes the parsed value
+CREATURE_ENERGY_DECAY = args.creature_energy_decay
+FOOD_ENERGY_GAIN = args.food_energy_gain
+MAX_FOOD_COUNT = args.max_food_count
+
+MUTATION_CHANCE = args.mutation_chance
+NN_MUTATION_AMOUNT = args.nn_mutation_amount
+COLOR_MUTATION_AMOUNT = args.color_mutation_amount
+
+GENERATION_LENGTH_FRAMES = args.generation_length_frames
+SELECTION_PERCENTAGE = args.selection_percentage
+CREATURE_MAX_ENERGY = args.creature_max_energy
+
+FOOD_LIMIT_PER_GENERATION = args.food_limit_per_generation
+
+LOG_DIRECTORY = DEFAULT_LOG_DIRECTORY
+LOG_ENABLED = bool(args.log_enabled) # Convert 0/1 back to boolean
+LIVE_LOG_FILE_NAME = DEFAULT_LIVE_LOG_FILE_NAME
 current_log_filepath = os.path.join(LOG_DIRECTORY, LIVE_LOG_FILE_NAME)
+
 
 # --- Helper function for Neural Network (Activation Functions) ---
 def tanh(x):
@@ -56,7 +126,7 @@ def sigmoid(x):
 def relu(x):
     return max(0, x)
 
-# --- The Creature Class ---
+# --- The Creature Class (No changes needed here) ---
 class Creature:
     def __init__(self, x=None, y=None, color=None, energy=None, nn_weights_ih=None, nn_biases_h=None, nn_weights_ho=None, nn_biases_o=None):
         self.x = x if x is not None else random.randint(0, WIDTH)
@@ -75,7 +145,7 @@ class Creature:
         self.weights_ih = [[random.uniform(-1, 1) for _ in range(NN_HIDDEN_NODES)] for _ in range(NN_INPUT_NODES)] if nn_weights_ih is None else nn_weights_ih
         self.biases_h = [random.uniform(-1, 1) for _ in range(NN_HIDDEN_NODES)] if nn_biases_h is None else nn_biases_h
         self.weights_ho = [[random.uniform(-1, 1) for _ in range(NN_OUTPUT_NODES)] for _ in range(NN_HIDDEN_NODES)] if nn_weights_ho is None else nn_weights_ho
-        self.biases_o = [random.uniform(-1, 1) for _ in range(NN_OUTPUT_NODES)] if nn_biases_o is None else nn_biases_o
+        self.biases_o = [random.uniform(-1, 1) for _ in range(NN_HIDDEN_NODES)] if nn_biases_o is None else nn_biases_o # FIX: Should be NN_OUTPUT_NODES
 
     def get_sensor_data(self, food_items):
         inputs = []
@@ -237,9 +307,10 @@ class Creature:
                         nn_weights_ih=offspring_weights_ih,
                         nn_biases_h=offspring_biases_h,
                         nn_weights_ho=offspring_weights_ho,
-                        nn_biases_o=offspring_biases_o)
+                        nn_biases_o=offspring_biases_o) # FIX: Should be NN_OUTPUT_NODES
 
-# --- The Food Class ---
+
+# --- The Food Class (No changes needed here) ---
 class Food:
     def __init__(self):
         self.x = random.randint(0, WIDTH)
@@ -254,6 +325,7 @@ class Food:
 # --- 2. Initialize Pygame ---
 pygame.init()
 
+# The screen size will now be determined by the arguments passed or defaults
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SRCALPHA)
 pygame.display.set_caption("Evolution Simulator Visualizer (NN)")
 font = pygame.font.Font(None, 24)
@@ -263,8 +335,8 @@ clock = pygame.time.Clock()
 # --- 3. Game State ---
 creatures = []
 food_items = []
-food_eaten_count = 0 # Total food eaten across ALL generations
-food_eaten_this_generation = 0 # Food eaten in the CURRENT generation
+food_eaten_count = 0
+food_eaten_this_generation = 0
 current_generation = 0
 frame_count_this_generation = 0
 
@@ -274,7 +346,7 @@ def create_initial_population(count):
         new_population.append(Creature())
     return new_population
 
-# This line MUST come AFTER INITIAL_CREATURE_COUNT is defined
+# This line MUST come AFTER INITIAL_CREATURE_COUNT is defined (which it now is, from args)
 creatures = create_initial_population(INITIAL_CREATURE_COUNT)
 
 # --- Logging Setup ---
@@ -283,7 +355,6 @@ log_writer = None
 if LOG_ENABLED:
     if not os.path.exists(LOG_DIRECTORY):
         os.makedirs(LOG_DIRECTORY)
-    # Open in 'w' mode to overwrite existing file
     log_file = open(current_log_filepath, 'w', newline='')
     log_writer = csv.writer(log_file)
     log_writer.writerow([
@@ -307,16 +378,13 @@ simulation_active = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            running = False
-            if log_file:
-                log_file.close()
+            running = False # This will break the loop and proceed to pygame.quit()
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_r: # 'R' key now restarts the entire simulation
                 print("--- RESTARTING FULL SIMULATION ---")
-                # Close existing log file if open
                 if log_file:
                     log_file.close()
-                
+
                 # Reset all game state variables
                 creatures = create_initial_population(INITIAL_CREATURE_COUNT)
                 food_items = []
@@ -324,7 +392,7 @@ while running:
                 food_eaten_this_generation = 0
                 current_generation = 0
                 frame_count_this_generation = 0
-                simulation_active = True # Ensure it's active after restart
+                simulation_active = True
 
                 # Re-initialize logging for the new run (overwriting the file)
                 if LOG_ENABLED:
@@ -346,7 +414,6 @@ while running:
         frame_count_this_generation += 1
 
         # --- Generational Cycle Logic ---
-        # A new generation starts if time is up OR enough food has been eaten in THIS generation
         if frame_count_this_generation >= GENERATION_LENGTH_FRAMES or food_eaten_this_generation >= FOOD_LIMIT_PER_GENERATION:
             # --- Log data before advancing generation ---
             if LOG_ENABLED and log_writer:
@@ -367,14 +434,14 @@ while running:
                     len(survivors_for_log_list),
                     len(creatures),
                     f"{avg_survivor_energy:.2f}",
-                    frame_count_this_generation # Log frames taken for *this* generation
+                    frame_count_this_generation
                 ])
-                log_file.flush() # Ensure data is written to disk immediately
+                log_file.flush()
 
             current_generation += 1
-            frame_count_this_generation = 0 # Reset frame count for the new generation
+            frame_count_this_generation = 0
 
-            # 1. Selection: Sort creatures by fitness (food_eaten_individual is best for food-finders)
+            # 1. Selection
             living_creatures_for_selection = [c for c in creatures if not c.is_dying]
             living_creatures_for_selection.sort(key=lambda c: c.food_eaten_individual, reverse=True)
 
@@ -386,7 +453,11 @@ while running:
                 print(f"Gen {current_generation-1}: No survivors from previous generation. Re-initializing population.")
                 new_generation_creatures = create_initial_population(INITIAL_CREATURE_COUNT)
             else:
-                for _ in range(INITIAL_CREATURE_COUNT):
+                # Add survivors directly to the new generation to ensure their genes persist
+                # new_generation_creatures.extend(survivors) # Optional: directly carry over survivors
+                
+                # Fill remaining spots with offspring from survivors
+                for _ in range(INITIAL_CREATURE_COUNT): # Ensure fixed population size
                     parent = random.choice(survivors)
                     offspring = parent.reproduce()
                     if offspring:
@@ -396,14 +467,14 @@ while running:
 
             creatures = []
             creatures.extend(new_generation_creatures)
-            food_items = [] # Clear food for a clean start to the new generation
+            food_items = [] # Clear food for a clean start
 
-            food_eaten_this_generation = 0 # IMPORTANT: Reset this for the new generation!
+            food_eaten_this_generation = 0
 
             print(f"--- Generation {current_generation} started. Population: {len(creatures)}. Top Breeder Food: {survivors[0].food_eaten_individual if survivors else 'N/A'} ---")
 
 
-        # Spawn new food if below max limit (happens continuously within a generation)
+        # Spawn new food if below max limit
         if len(food_items) < MAX_FOOD_COUNT:
             if random.random() < 0.1:
                 food_items.append(Food())
@@ -418,8 +489,8 @@ while running:
             for food in eaten:
                 if food in food_items:
                     food_items.remove(food)
-                    food_eaten_count += 1              # Global total food counter
-                    food_eaten_this_generation += 1    # Per-generation food counter
+                    food_eaten_count += 1
+                    food_eaten_this_generation += 1
 
             if creature.energy <= 0 and not creature.is_dying:
                 creature.is_dying = True
@@ -466,4 +537,4 @@ while running:
 pygame.quit()
 if log_file:
     log_file.close()
-sys.exit()
+sys.exit() # Important for the subprocess to fully exit
