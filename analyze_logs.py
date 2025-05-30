@@ -38,13 +38,16 @@ def analyze_simulation_logs(filepath):
         "Num_Survivors",
         "Population_Size_Start_Gen",
         "Avg_Survivor_Energy",
-        "Frames_This_Gen"
+        "Frames_This_Gen",
+        "Total_Bursts_Activated_Gen",  # NEW
+        "Total_Burst_Energy_Spent_Gen" # NEW
     ]
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
     # Drop rows where critical numeric columns are NaN after coercion
+    # Ensure new burst columns are not critical for dropping unless desired
     df.dropna(subset=["Food_Eaten_Gen", "Num_Survivors", "Top_Creature_Food_Eaten"], inplace=True)
 
     if df.empty:
@@ -55,53 +58,67 @@ def analyze_simulation_logs(filepath):
 
     # --- Plotting ---
     sns.set_style("whitegrid")
-    plt.figure(figsize=(14, 10))
+    # Adjusted figure size and subplot grid for 8 plots (4 rows, 2 columns)
+    plt.figure(figsize=(16, 18)) # Increased height to accommodate more plots
 
     # Plot 1: Food Eaten per Generation
-    plt.subplot(3, 2, 1)
+    plt.subplot(4, 2, 1) # Changed to 4 rows, 2 columns
     sns.lineplot(x="Generation", y="Food_Eaten_Gen", data=df)
     plt.title("Food Eaten Per Generation")
     plt.xlabel("Generation")
     plt.ylabel("Food Eaten")
 
     # Plot 2: Top Creature's Food Eaten
-    plt.subplot(3, 2, 2)
+    plt.subplot(4, 2, 2) # Changed to 4 rows, 2 columns
     sns.lineplot(x="Generation", y="Top_Creature_Food_Eaten", data=df, color='orange')
     plt.title("Top Creature's Food Eaten Per Generation")
     plt.xlabel("Generation")
     plt.ylabel("Food Eaten by Best Individual")
 
     # Plot 3: Number of Survivors
-    plt.subplot(3, 2, 3)
+    plt.subplot(4, 2, 3) # Changed to 4 rows, 2 columns
     sns.lineplot(x="Generation", y="Num_Survivors", data=df, color='green')
     plt.title("Number of Survivors Per Generation")
     plt.xlabel("Generation")
     plt.ylabel("Count")
 
     # Plot 4: Population Size at Start of Generation
-    plt.subplot(3, 2, 4)
+    plt.subplot(4, 2, 4) # Changed to 4 rows, 2 columns
     sns.lineplot(x="Generation", y="Population_Size_Start_Gen", data=df, color='red')
     plt.title("Population Size at Start of Generation")
     plt.xlabel("Generation")
     plt.ylabel("Population Count")
 
     # Plot 5: Average Survivor Energy
-    plt.subplot(3, 2, 5)
+    plt.subplot(4, 2, 5) # Changed to 4 rows, 2 columns
     sns.lineplot(x="Generation", y="Avg_Survivor_Energy", data=df, color='purple')
     plt.title("Average Energy of Survivors Per Generation")
     plt.xlabel("Generation")
     plt.ylabel("Average Energy")
 
     # Plot 6: Frames This Generation (Duration)
-    plt.subplot(3, 2, 6)
+    plt.subplot(4, 2, 6) # Changed to 4 rows, 2 columns
     sns.lineplot(x="Generation", y="Frames_This_Gen", data=df, color='brown')
     plt.title("Frames per Generation (Duration)")
     plt.xlabel("Generation")
     plt.ylabel("Frames")
 
+    # NEW Plot 7: Total Bursts Activated Per Generation
+    plt.subplot(4, 2, 7) # New subplot
+    sns.lineplot(x="Generation", y="Total_Bursts_Activated_Gen", data=df, color='blue')
+    plt.title("Total Bursts Activated Per Generation")
+    plt.xlabel("Generation")
+    plt.ylabel("Number of Bursts")
 
-    plt.tight_layout()
-    plt.suptitle("Evolution Simulation Metrics Over Generations", y=1.02, fontsize=16)
+    # NEW Plot 8: Total Burst Energy Spent Per Generation
+    plt.subplot(4, 2, 8) # New subplot
+    sns.lineplot(x="Generation", y="Total_Burst_Energy_Spent_Gen", data=df, color='cyan')
+    plt.title("Total Energy Spent on Bursts Per Generation")
+    plt.xlabel("Generation")
+    plt.ylabel("Energy Spent")
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.98]) # Adjusted layout to make space for suptitle
+    plt.suptitle("Evolution Simulation Metrics Over Generations (Including Speed Burst)", y=1.00, fontsize=16) # Updated title
     plt.show()
 
     # --- Optional: Correlation Heatmap ---
@@ -109,7 +126,7 @@ def analyze_simulation_logs(filepath):
     correlation_matrix = df[numeric_cols].corr()
     print(correlation_matrix)
 
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(10, 8)) # Adjusted size for potentially more columns in heatmap
     sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f", linewidths=.5)
     plt.title("Correlation Matrix of Simulation Metrics")
     plt.show()

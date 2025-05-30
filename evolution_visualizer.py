@@ -5,9 +5,9 @@ import math
 import datetime
 import os
 import csv
-import argparse # Import argparse
+import argparse
 
-# --- 1. Constants and Configuration (Now with defaults that can be overridden) ---
+# --- 1. Constants and Configuration ---
 # Define default values for your constants. These will be used if no command-line arguments are provided.
 DEFAULT_WIDTH, DEFAULT_HEIGHT = 1000, 700
 DEFAULT_FPS = 60
@@ -28,10 +28,18 @@ DEFAULT_MUTATION_CHANCE = 0.02
 DEFAULT_NN_MUTATION_AMOUNT = 0.1
 DEFAULT_COLOR_MUTATION_AMOUNT = 30
 
-# Neural Network Architecture Constants (these are usually fixed per model)
-NN_INPUT_NODES = 3
+# --- NEW: Speed Burst Constants ---
+BURST_ENERGY_COST = 10     # Energy consumed for one burst
+BURST_SPEED_MULTIPLIER = 1.8 # How much faster they move (e.g., 1.8x base speed)
+BURST_DURATION_FRAMES = 10 # How many frames the burst lasts
+BURST_NN_THRESHOLD = 0.5   # NN output must exceed this to trigger burst (for tanh output, range -1 to 1)
+
+
+# Neural Network Architecture Constants
+NN_INPUT_NODES = 3  # Energy, Normalized Distance to Food, Normalized Angle to Food
 NN_HIDDEN_NODES = 4
-NN_OUTPUT_NODES = 1
+NN_OUTPUT_NODES = 2 # Changed from 1 to 2: 1 for steering, 1 for burst
+
 
 # Generation Control Defaults
 DEFAULT_GENERATION_LENGTH_FRAMES = 5000
@@ -45,6 +53,8 @@ DEFAULT_FOOD_LIMIT_PER_GENERATION = 500
 DEFAULT_LOG_DIRECTORY = "simulation_logs"
 DEFAULT_LOG_ENABLED = True
 DEFAULT_LIVE_LOG_FILE_NAME = "evolution_live_log.csv"
+current_log_filepath = os.path.join(DEFAULT_LOG_DIRECTORY, DEFAULT_LIVE_LOG_FILE_NAME)
+
 
 # --- Argument Parsing ---
 parser = argparse.ArgumentParser(description="Evolution Simulator (Pygame).")
@@ -95,7 +105,7 @@ FOOD_COLOR = DEFAULT_FOOD_COLOR
 FOOD_RADIUS = DEFAULT_FOOD_RADIUS
 
 CREATURE_RADIUS = DEFAULT_CREATURE_RADIUS
-INITIAL_CREATURE_COUNT = args.initial_creature_count # This now takes the parsed value
+INITIAL_CREATURE_COUNT = args.initial_creature_count
 CREATURE_ENERGY_DECAY = args.creature_energy_decay
 FOOD_ENERGY_GAIN = args.food_energy_gain
 MAX_FOOD_COUNT = args.max_food_count
@@ -111,41 +121,49 @@ CREATURE_MAX_ENERGY = args.creature_max_energy
 FOOD_LIMIT_PER_GENERATION = args.food_limit_per_generation
 
 LOG_DIRECTORY = DEFAULT_LOG_DIRECTORY
-LOG_ENABLED = bool(args.log_enabled) # Convert 0/1 back to boolean
-LIVE_LOG_FILE_NAME = DEFAULT_LIVE_LOG_FILE_NAME
-current_log_filepath = os.path.join(LOG_DIRECTORY, LIVE_LOG_FILE_NAME)
+LOG_ENABLED = bool(args.log_enabled)
 
 
 # --- Helper function for Neural Network (Activation Functions) ---
 def tanh(x):
     return math.tanh(x)
 
-def sigmoid(x):
+def sigmoid(x): # sigmoid is useful for probability-like outputs (0 to 1)
     return 1 / (1 + math.exp(-1 * x))
 
 def relu(x):
     return max(0, x)
 
-# --- The Creature Class (No changes needed here) ---
+# --- The Creature Class ---
 class Creature:
-    def __init__(self, x=None, y=None, color=None, energy=None, nn_weights_ih=None, nn_biases_h=None, nn_weights_ho=None, nn_biases_o=None):
+    def __init__(self, x=None, y=None, color=None, energy=None,
+                 nn_weights_ih=None, nn_biases_h=None, nn_weights_ho=None, nn_biases_o=None):
         self.x = x if x is not None else random.randint(0, WIDTH)
         self.y = y if y is not None else random.randint(0, HEIGHT)
         self.radius = CREATURE_RADIUS
         self.color = color if color is not None else (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255))
         self.energy = energy if energy is not None else CREATURE_MAX_ENERGY
 
-        self.speed = 1.5
+        self.speed = 1.5 # Base speed
         self.direction = random.uniform(0, 360)
 
         self.is_dying = False
         self.fade_alpha = 255
         self.food_eaten_individual = 0
 
+        # --- NEW: Burst State ---
+        self.is_bursting = False
+        self.burst_frames_left = 0
+        self.bursts_activated_individual = 0 # Track individual bursts
+        self.energy_spent_bursting_individual = 0 # Track individual energy spent on bursts
+
+
+        # Neural network initialization
         self.weights_ih = [[random.uniform(-1, 1) for _ in range(NN_HIDDEN_NODES)] for _ in range(NN_INPUT_NODES)] if nn_weights_ih is None else nn_weights_ih
         self.biases_h = [random.uniform(-1, 1) for _ in range(NN_HIDDEN_NODES)] if nn_biases_h is None else nn_biases_h
         self.weights_ho = [[random.uniform(-1, 1) for _ in range(NN_OUTPUT_NODES)] for _ in range(NN_HIDDEN_NODES)] if nn_weights_ho is None else nn_weights_ho
-        self.biases_o = [random.uniform(-1, 1) for _ in range(NN_HIDDEN_NODES)] if nn_biases_o is None else nn_biases_o # FIX: Should be NN_OUTPUT_NODES
+        self.biases_o = [random.uniform(-1, 1) for _ in range(NN_OUTPUT_NODES)] if nn_biases_o is None else nn_biases_o
+
 
     def get_sensor_data(self, food_items):
         inputs = []
@@ -200,26 +218,46 @@ class Creature:
                 hidden_inputs[j] += inputs[i] * self.weights_ih[i][j]
         hidden_outputs = [tanh(hidden_inputs[j] + self.biases_h[j]) for j in range(NN_HIDDEN_NODES)]
 
-        output_inputs = [0.0] * NN_OUTPUT_NODES
+        output_inputs = [0.0] * NN_OUTPUT_NODES # This is now 2 outputs
         for i in range(NN_HIDDEN_NODES):
             for j in range(NN_OUTPUT_NODES):
                 output_inputs[j] += hidden_outputs[i] * self.weights_ho[i][j]
-        final_outputs = [tanh(output_inputs[j] + self.biases_o[j]) for j in range(NN_OUTPUT_NODES)]
+        final_outputs = [tanh(output_inputs[j] + self.biases_o[j]) for j in range(NN_OUTPUT_NODES)] # Apply tanh to both outputs
 
-        return final_outputs[0]
+        steering_force = final_outputs[0]
+        burst_decision_raw = final_outputs[1] # This is the raw output for burst
+
+        return steering_force, burst_decision_raw
 
     def move(self, food_items):
-        inputs = self.get_sensor_data(food_items)
-        steering_force = self.think(inputs)
+        sensor_inputs = self.get_sensor_data(food_items)
+        steering_force, burst_decision_raw = self.think(sensor_inputs)
 
-        MAX_TURN_ANGLE = 7
-        self.direction += steering_force * MAX_TURN_ANGLE
+        # --- Speed Burst Logic ---
+        # If not currently bursting and NN output suggests burst and has enough energy
+        if not self.is_bursting and burst_decision_raw > BURST_NN_THRESHOLD and self.energy >= BURST_ENERGY_COST:
+            self.energy -= BURST_ENERGY_COST
+            self.is_bursting = True
+            self.burst_frames_left = BURST_DURATION_FRAMES
+            self.bursts_activated_individual += 1 # Increment individual burst count
+            self.energy_spent_bursting_individual += BURST_ENERGY_COST # Track individual energy spent
+
+        current_speed = self.speed
+        if self.is_bursting:
+            current_speed = self.speed * BURST_SPEED_MULTIPLIER
+            self.burst_frames_left -= 1
+            if self.burst_frames_left <= 0:
+                self.is_bursting = False
+
+        # Apply current_speed for movement
+        self.direction += steering_force * 7 # Max turn angle
         self.direction = self.direction % 360
 
         direction_vector = pygame.math.Vector2.from_polar((1, self.direction))
-        new_x = self.x + self.speed * direction_vector.x
-        new_y = self.y + self.speed * direction_vector.y
+        new_x = self.x + current_speed * direction_vector.x
+        new_y = self.y + current_speed * direction_vector.y
 
+        # Boundary collision logic
         if new_x - self.radius < 0:
             self.x = self.radius
             self.direction = 180 - self.direction
@@ -238,8 +276,10 @@ class Creature:
         else:
             self.y = new_y
 
+        # Energy decay
         if not self.is_dying:
             self.energy -= CREATURE_ENERGY_DECAY
+
 
     def draw(self, screen):
         current_color = self.color
@@ -250,6 +290,9 @@ class Creature:
             screen.blit(s, (int(self.x - self.radius), int(self.y - self.radius)))
         else:
             pygame.draw.circle(screen, current_color, (int(self.x), int(self.y)), self.radius)
+            if self.is_bursting: # Draw a small dot or glow to indicate bursting
+                pygame.draw.circle(screen, (255, 255, 0), (int(self.x), int(self.y)), self.radius + 2, 1) # Yellow outline
+
 
         line_length = self.radius * 1.5
         direction_for_line = pygame.math.Vector2.from_polar((1, self.direction))
@@ -291,10 +334,10 @@ class Creature:
             if random.random() < MUTATION_CHANCE:
                 offspring_biases_h[i] += random.uniform(-NN_MUTATION_AMOUNT, NN_MUTATION_AMOUNT)
         for i in range(NN_HIDDEN_NODES):
-            for j in range(NN_OUTPUT_NODES):
+            for j in range(NN_OUTPUT_NODES): # Loop over NN_OUTPUT_NODES (now 2)
                 if random.random() < MUTATION_CHANCE:
                     offspring_weights_ho[i][j] += random.uniform(-NN_MUTATION_AMOUNT, NN_MUTATION_AMOUNT)
-        for i in range(NN_OUTPUT_NODES):
+        for i in range(NN_OUTPUT_NODES): # Loop over NN_OUTPUT_NODES (now 2)
             if random.random() < MUTATION_CHANCE:
                 offspring_biases_o[i] += random.uniform(-NN_MUTATION_AMOUNT, NN_MUTATION_AMOUNT)
 
@@ -307,7 +350,7 @@ class Creature:
                         nn_weights_ih=offspring_weights_ih,
                         nn_biases_h=offspring_biases_h,
                         nn_weights_ho=offspring_weights_ho,
-                        nn_biases_o=offspring_biases_o) # FIX: Should be NN_OUTPUT_NODES
+                        nn_biases_o=offspring_biases_o)
 
 
 # --- The Food Class (No changes needed here) ---
@@ -325,7 +368,6 @@ class Food:
 # --- 2. Initialize Pygame ---
 pygame.init()
 
-# The screen size will now be determined by the arguments passed or defaults
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SRCALPHA)
 pygame.display.set_caption("Evolution Simulator Visualizer (NN)")
 font = pygame.font.Font(None, 24)
@@ -340,13 +382,17 @@ food_eaten_this_generation = 0
 current_generation = 0
 frame_count_this_generation = 0
 
+# --- NEW: Global counters for burst data per generation ---
+total_bursts_activated_gen = 0
+total_burst_energy_spent_gen = 0
+
+
 def create_initial_population(count):
     new_population = []
     for _ in range(count):
         new_population.append(Creature())
     return new_population
 
-# This line MUST come AFTER INITIAL_CREATURE_COUNT is defined (which it now is, from args)
 creatures = create_initial_population(INITIAL_CREATURE_COUNT)
 
 # --- Logging Setup ---
@@ -357,6 +403,7 @@ if LOG_ENABLED:
         os.makedirs(LOG_DIRECTORY)
     log_file = open(current_log_filepath, 'w', newline='')
     log_writer = csv.writer(log_file)
+    # --- UPDATED CSV HEADER ---
     log_writer.writerow([
         "Generation",
         "Food_Eaten_Gen",
@@ -364,6 +411,8 @@ if LOG_ENABLED:
         "Num_Survivors",
         "Population_Size_Start_Gen",
         "Avg_Survivor_Energy",
+        "Total_Bursts_Activated_Gen", # NEW
+        "Total_Burst_Energy_Spent_Gen", # NEW
         "Frames_This_Gen"
     ])
     print(f"Logging to: {current_log_filepath}")
@@ -378,9 +427,8 @@ simulation_active = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            running = False # This will break the loop and proceed to pygame.quit()
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_r: # 'R' key now restarts the entire simulation
+            running = False
+        if event.type == pygame.K_r: # 'R' key now restarts the entire simulation
                 print("--- RESTARTING FULL SIMULATION ---")
                 if log_file:
                     log_file.close()
@@ -394,10 +442,15 @@ while running:
                 frame_count_this_generation = 0
                 simulation_active = True
 
+                # --- NEW: Reset burst counters on restart ---
+                total_bursts_activated_gen = 0
+                total_burst_energy_spent_gen = 0
+
                 # Re-initialize logging for the new run (overwriting the file)
                 if LOG_ENABLED:
                     log_file = open(current_log_filepath, 'w', newline='') # Overwrite
                     log_writer = csv.writer(log_file)
+                    # --- UPDATED CSV HEADER for restart ---
                     log_writer.writerow([
                         "Generation",
                         "Food_Eaten_Gen",
@@ -405,9 +458,12 @@ while running:
                         "Num_Survivors",
                         "Population_Size_Start_Gen",
                         "Avg_Survivor_Energy",
+                        "Total_Bursts_Activated_Gen", # NEW
+                        "Total_Burst_Energy_Spent_Gen", # NEW
                         "Frames_This_Gen"
                     ])
                     print(f"Logging to: {current_log_filepath}")
+
 
     # --- Update Game State (Evolution Logic) ---
     if simulation_active:
@@ -419,9 +475,9 @@ while running:
             if LOG_ENABLED and log_writer:
                 living_creatures_for_log = [c for c in creatures if not c.is_dying]
                 living_creatures_for_log.sort(key=lambda c: c.food_eaten_individual, reverse=True)
-                
+
                 top_creature_food = living_creatures_for_log[0].food_eaten_individual if living_creatures_for_log else 0
-                
+
                 num_survivors_for_log = max(1, int(len(living_creatures_for_log) * SELECTION_PERCENTAGE))
                 survivors_for_log_list = living_creatures_for_log[:num_survivors_for_log]
 
@@ -434,6 +490,8 @@ while running:
                     len(survivors_for_log_list),
                     len(creatures),
                     f"{avg_survivor_energy:.2f}",
+                    total_bursts_activated_gen, # NEW
+                    total_burst_energy_spent_gen, # NEW
                     frame_count_this_generation
                 ])
                 log_file.flush()
@@ -453,9 +511,6 @@ while running:
                 print(f"Gen {current_generation-1}: No survivors from previous generation. Re-initializing population.")
                 new_generation_creatures = create_initial_population(INITIAL_CREATURE_COUNT)
             else:
-                # Add survivors directly to the new generation to ensure their genes persist
-                # new_generation_creatures.extend(survivors) # Optional: directly carry over survivors
-                
                 # Fill remaining spots with offspring from survivors
                 for _ in range(INITIAL_CREATURE_COUNT): # Ensure fixed population size
                     parent = random.choice(survivors)
@@ -470,6 +525,9 @@ while running:
             food_items = [] # Clear food for a clean start
 
             food_eaten_this_generation = 0
+            # --- NEW: Reset burst counters for the new generation ---
+            total_bursts_activated_gen = 0
+            total_burst_energy_spent_gen = 0
 
             print(f"--- Generation {current_generation} started. Population: {len(creatures)}. Top Breeder Food: {survivors[0].food_eaten_individual if survivors else 'N/A'} ---")
 
@@ -503,6 +561,10 @@ while running:
 
         for creature in creatures_to_remove_after_fade:
             if creature in creatures:
+                # Before removing, add its lifetime burst stats to the generation totals
+                # Removed 'global' keywords as these vars are already in global scope
+                total_bursts_activated_gen += creature.bursts_activated_individual
+                total_burst_energy_spent_gen += creature.energy_spent_bursting_individual
                 creatures.remove(creature)
 
 
@@ -526,6 +588,11 @@ while running:
     screen.blit(gen_eaten_text, (10, 100))
     gen_text = font.render(f"Generation: {current_generation}", True, WHITE)
     screen.blit(gen_text, (10, 130))
+    bursts_text = font.render(f"Gen Bursts: {total_bursts_activated_gen}", True, WHITE) # NEW UI LINE
+    screen.blit(bursts_text, (10, 160)) # Adjusted position
+    burst_energy_text = font.render(f"Gen Burst Energy: {total_burst_energy_spent_gen:.0f}", True, WHITE) # NEW UI LINE
+    screen.blit(burst_energy_text, (10, 190)) # Adjusted position
+
 
     # --- Update the Display ---
     pygame.display.flip()
@@ -537,4 +604,4 @@ while running:
 pygame.quit()
 if log_file:
     log_file.close()
-sys.exit() # Important for the subprocess to fully exit
+sys.exit()
