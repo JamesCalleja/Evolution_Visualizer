@@ -1,49 +1,82 @@
-# Evolution Simulator
+# Evolution Visualizer
 
-This project simulates the basic principles of natural selection and evolution using simple "critters" (creatures) that learn to find food in a 2D environment. Creatures with neural networks that are more successful at finding food survive, reproduce, and pass on their "genetic" (neural network) traits, leading to observable evolutionary behaviors over generations.
-
----
+This project provides a Python-based simulation of artificial evolution, where simple creatures with neural networks learn to navigate an environment and consume food. It includes a graphical user interface (GUI) for adjusting simulation parameters, real-time visualization of the evolutionary process, and post-simulation analysis tools.
 
 ## Features
 
-* **Generational Evolution:** Creatures evolve over discrete generations, with selection based on fitness (food consumed).
-* **Neural Network Brains:** Each creature possesses a small neural network that takes sensory input from the environment and outputs a steering force.
-* **Basic Environmental Sensing:** Creatures can sense their own energy levels, the distance to the nearest food, and the angle to the nearest food.
-* **Genetic Mutation:** Neural network weights/biases and creature colors undergo slight random mutations during reproduction, introducing variation for natural selection to act upon.
-* **Real-time Visualization:** A Pygame window displays the creatures, food, and their movement.
-* **Live Evolution Graph:** A separate Matplotlib window provides a real-time plot of key evolutionary metrics (e.g., top creature's food eaten, generation length) as the simulation progresses.
-* **Detailed Logging:** Comprehensive data for each generation is saved to a CSV log file for later in-depth analysis.
-
----
-
-## How It Works
-
-1.  **Initialization:** A population of creatures with randomly initialized neural networks and colors is created. Food items are randomly scattered.
-2.  **Simulation Loop (Per Generation):**
-    * Creatures move around the environment, constantly spending energy.
-    * They use their neural networks to process sensory data (energy, food distance, food angle) and decide how to steer.
-    * If a creature collides with food, it consumes the food, gains energy, and its individual "food eaten" count increases.
-    * Creatures lose energy over time. If their energy drops to zero, they "die" and are removed from the simulation.
-    * The generation continues until either a set amount of food is consumed by the population or a maximum number of frames (time) has passed.
-3.  **Selection & Reproduction:**
-    * At the end of a generation, a specified percentage of the most successful creatures (those that ate the most food) are selected as "survivors."
-    * These survivors become parents, reproducing to create the next generation. Offspring inherit the parents' neural network weights/biases and colors, with small mutations introduced.
-    * The environment is reset with new food, and the cycle repeats.
-4.  **Logging & Visualization:** Key statistics for each completed generation are recorded in a CSV file, and the real-time graph updates to show performance trends.
-
----
+* **Evolutionary Simulation:** Creatures with neural networks (NNs) navigate a 2D environment, seek and consume food, and evolve over generations.
+* **Genetic Algorithm:** Implements selection based on food eaten, reproduction with genetic inheritance, and mutation of NN weights/biases and creature colors.
+* **Customizable Parameters:** Adjust key evolutionary and environmental metrics through a user-friendly GUI.
+* **Real-time Visualization:** Watch the simulation unfold in a Pygame window, observing creature behavior and environmental dynamics.
+* **Live Logging:** Records vital statistics (food eaten, survivor count, population size, etc.) for each generation into a CSV file.
+* **Post-Simulation Analysis:** Automatically generates insightful plots and a correlation matrix of evolutionary trends after the simulation is stopped.
+* **Interactive GUI:** Start, stop, and control simulation parameters from a dedicated Tkinter application.
 
 ## Getting Started
 
-To run this simulation, you'll need Python and a few libraries. It's **highly recommended** to use a virtual environment to manage dependencies.
+These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 
-### 1. Prerequisites
+### Prerequisites
 
-* Python 3.8+ (You appear to be using 3.13.3)
+You need Python 3.8+ installed on your system.
+It's highly recommended to use a virtual environment to manage dependencies.
 
-### 2. Setup (Recommended: Using a Virtual Environment)
+### Installation
 
-Navigate to your project directory in PowerShell (or Command Prompt):
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/JamesCalleja/Evolution_Visualizer-.git](https://github.com/JamesCalleja/Evolution_Visualizer-.git)
+    cd Evolution_Visualizer-
+    ```
 
-```powershell
-cd C:\Code\EvolutionSimulator
+2.  **Create and activate a virtual environment:**
+    ```bash
+    python -m venv .venv
+    # On Windows:
+    .\.venv\Scripts\activate
+    # On macOS/Linux:
+    source ./.venv/bin/activate
+    ```
+    (Note: Your directory listing showed `simvis` and `.venv`, if you prefer `simvis`, use `python -m venv simvis` and activate accordingly.)
+
+3.  **Install the required Python packages:**
+    ```bash
+    pip install pygame pandas matplotlib seaborn
+    ```
+
+## How to Run the Simulator
+
+The primary way to run the simulation and interact with its parameters is through the GUI.
+
+1.  **Activate your virtual environment** (if not already active):
+    ```bash
+    # On Windows:
+    .\.venv\Scripts\activate
+    # On macOS/Linux:
+    source ./.venv/bin/activate
+    ```
+2.  **Run the GUI application:**
+    ```bash
+    python gui.py
+    ```
+3.  **Adjust Parameters:** The GUI window will appear. You can modify various simulation metrics such as initial creature count, mutation rates, generation length, and more.
+4.  **Start the Simulation:** Click the **"Run Simulation"** button. A new Pygame window will open, displaying the simulation. The GUI will remain responsive.
+5.  **Stop the Simulation:** Click the **"Stop Simulation"** button on the GUI. This will close the Pygame window.
+
+## Post-Simulation Analysis
+
+Immediately after you click **"Stop Simulation"** in the GUI, the `analyze_logs.py` script will automatically execute. This script reads the `evolution_live_log.csv` file (located in the `simulation_logs/` directory) and generates a series of plots and a correlation matrix, providing insights into the evolutionary progress of your simulation run.
+
+## Project Structure
+
+* `evolution_visualizer.py`: The core simulation logic, including creature behavior, neural networks, genetic algorithm, and Pygame rendering. It accepts parameters via command-line arguments.
+* `gui.py`: The Tkinter-based graphical user interface for controlling simulation parameters and launching/stopping the simulation. It orchestrates the running of `evolution_visualizer.py` as a subprocess.
+* `analyze_logs.py`: A script that reads the simulation log data (`evolution_live_log.csv`) and generates visualizations (charts, correlation heatmap) using `pandas`, `matplotlib`, and `seaborn`.
+* `simulation_logs/`: A directory created by `evolution_visualizer.py` to store the `evolution_live_log.csv` file, which records generational statistics.
+* `README.md`: This file.
+* `LICENSE`: Project license information.
+* `.gitignore`: Specifies files and directories to be ignored by Git (e.g., virtual environment folders, `__pycache__`).
+
+## License
+
+This project is licensed under the MIT License - see the `LICENSE` file for details.
