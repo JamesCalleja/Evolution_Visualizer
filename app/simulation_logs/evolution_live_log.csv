@@ -1,0 +1,4 @@
+Generation,Frames_This_Gen,Food_Eaten_Gen,Num_Survivors,Population_Size_Start_Gen,Avg_Survivor_Energy,Top_Creature_Food_Eaten_Individual,Top_Creature_Energy_Individual,Top_Creature_Collisions_Individual,Top_Creature_Bursts_Activated_Individual,Total_Bursts_Activated_Gen,Total_Burst_Energy_Spent_Gen,Total_Collisions_Gen,Top_Creature_Combined_Fitness
+0,500,57,47,50,56.63829787234136,5,84.20000000000033,0,5,171,1710.0,9,225.0
+1,500,57,49,50,57.489795918368245,4,95.70000000000024,0,3,212,2120.0,8,175.0
+2,500,70,50,50,47.67900000000094,4,50.50000000000111,0,9,302,3020.0,35,205.0
