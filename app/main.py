@@ -263,7 +263,7 @@ while running:
                 
                 # Consider all creatures from the just-finished generation (even those dying but with stats)
                 # The 'creatures' list here still holds the creatures from the just-finished generation.
-                all_creatures_past_gen_sorted_by_food = sorted(creatures, key=lambda c: c.food_eaten_individual, reverse=True)
+                all_creatures_past_gen_sorted_by_food = sorted(creatures, key=lambda c: c.calculate_fitness(), reverse=True)
                 
                 fallback_num_breeders = max(1, int(len(all_creatures_past_gen_sorted_by_food) * const.SELECTION_PERCENTAGE))
                 fallback_breeders = all_creatures_past_gen_sorted_by_food[:fallback_num_breeders]
