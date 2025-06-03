@@ -21,7 +21,8 @@ DEFAULT_PARAMS = {
     'log_enabled': True,
     'width': 1000,
     'height': 700,
-    'fps': 60
+    'fps': 60,
+    'nn_hidden_nodes': 4
 }
 
 class EvolutionSimulatorGUI(tk.Tk):
@@ -59,6 +60,7 @@ class EvolutionSimulatorGUI(tk.Tk):
         self.add_param_entry(main_frame, "NN Mutate Amount:", 'nn_mutation_amount', float, row); row += 1
         self.add_param_entry(main_frame, "Color Mutate Amount:", 'color_mutation_amount', int, row); row += 1
         self.add_param_entry(main_frame, "Selection % (0-1):", 'selection_percentage', float, row); row += 1
+        self.add_param_entry(main_frame, "NN Hidden Nodes:", 'nn_hidden_nodes', int, row); row += 1
 
         self.add_separator(main_frame, "Generation Control", row); row += 1
         self.add_param_entry(main_frame, "Gen Length (Frames):", 'generation_length_frames', int, row); row += 1

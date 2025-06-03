@@ -85,6 +85,8 @@ parser.add_argument('--nn_mutation_amount', type=float, default=DEFAULT_NN_MUTAT
                     help=f"Amount NN weights/biases can change during mutation (default: {DEFAULT_NN_MUTATION_AMOUNT})")
 parser.add_argument('--color_mutation_amount', type=int, default=DEFAULT_COLOR_MUTATION_AMOUNT,
                     help=f"Amount creature color can change during mutation (default: {DEFAULT_COLOR_MUTATION_AMOUNT})")
+parser.add_argument('--nn_hidden_nodes', type=int, default=NN_HIDDEN_NODES,
+                    help=f"Number of hidden nodes in the neural network (default: {NN_HIDDEN_NODES})")
 
 parser.add_argument('--generation_length_frames', type=int, default=DEFAULT_GENERATION_LENGTH_FRAMES,
                     help=f"Frames per generation (default: {DEFAULT_GENERATION_LENGTH_FRAMES})")
@@ -119,6 +121,7 @@ MAX_FOOD_COUNT = args.max_food_count
 
 MUTATION_CHANCE = args.mutation_chance
 NN_MUTATION_AMOUNT = args.nn_mutation_amount
+NN_HIDDEN_NODES = args.nn_hidden_nodes
 COLOR_MUTATION_AMOUNT = args.color_mutation_amount
 
 GENERATION_LENGTH_FRAMES = args.generation_length_frames
