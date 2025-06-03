@@ -12,14 +12,15 @@ from constants import (WIDTH, HEIGHT, WHITE, CREATURE_ENERGY_DECAY,
                        NN_HIDDEN_NODES, NN_INPUT_NODES, NN_OUTPUT_NODES,
                        NN_MUTATION_AMOUNT,
                        BURST_NN_THRESHOLD, BURST_ENERGY_COST, BURST_DURATION_FRAMES, BURST_SPEED_MULTIPLIER,
-                       FOOD_ENERGY_GAIN, FOOD_RADIUS, FOOD_COLOR, COLOR_MUTATION_AMOUNT, MUTATION_CHANCE)
+                       FOOD_ENERGY_GAIN, FOOD_RADIUS, FOOD_COLOR, COLOR_MUTATION_AMOUNT, MUTATION_CHANCE,
+                       MIN_SPAWN_DISTANCE_FROM_OBSTACLE, OBSTACLE_PENALTY, OBSTACLE_COLOR)
 from nn import tanh  # Assuming nn.py contains the tanh function
 
 
-# --- The Creature Class ---
+#  The Creature Class 
 class Creature:
     def __init__(self, x=None, y=None, color=None, energy=None,
-                 nn_weights_ih=None, nn_biases_h=None, nn_weights_ho=None, nn_biases_o=None):
+                 nn_weights_ih=None, nn_biases_h=None, nn_weights_ho=None, nn_biases_o=None, obstacles_ref=None,):
         self.x = x if x is not None else random.randint(0, WIDTH)
         self.y = y if y is not None else random.randint(0, HEIGHT)
         self.radius = CREATURE_RADIUS
@@ -33,7 +34,7 @@ class Creature:
         self.fade_alpha = 255
         self.food_eaten_individual = 0
 
-        # --- NEW: Burst State ---
+        #  NEW: Burst State 
         self.is_bursting = False
         self.burst_frames_left = 0
         self.bursts_activated_individual = 0 # Track individual bursts
@@ -45,9 +46,12 @@ class Creature:
         self.biases_h = [random.uniform(-1, 1) for _ in range(NN_HIDDEN_NODES)] if nn_biases_h is None else nn_biases_h
         self.weights_ho = [[random.uniform(-1, 1) for _ in range(NN_OUTPUT_NODES)] for _ in range(NN_HIDDEN_NODES)] if nn_weights_ho is None else nn_weights_ho
         self.biases_o = [random.uniform(-1, 1) for _ in range(NN_OUTPUT_NODES)] if nn_biases_o is None else nn_biases_o
+        
+        # Reference to obstacles (if any)
+        self.obstacles_ref = obstacles_ref # Store the reference to obstacles
 
 
-    def get_sensor_data(self, food_items):
+    def get_sensor_data(self, food_items, obstacles):
         inputs = []
         inputs.append(self.energy / CREATURE_MAX_ENERGY)
 
@@ -90,6 +94,57 @@ class Creature:
 
         normalized_angle = nearest_food_angle / 130.0
         inputs.append(normalized_angle)
+        
+        # 4. Nearest Obstacle Data (Normalized Distance and Angle)
+        nearest_obstacle_distance = math.hypot(WIDTH, HEIGHT) + 1
+        nearest_obstacle_angle = 0.0
+
+        if obstacles:
+            nearest_obstacle = None
+            for obs in obstacles:
+                # Calculate distance to closest point on obstacle rectangle
+                closest_x = max(obs.x, min(self.x, obs.x + obs.width))
+                closest_y = max(obs.y, min(self.y, obs.y + obs.height))
+                dist = math.hypot(self.x - closest_x, self.y - closest_y) - self.radius # Distance from creature edge
+
+                if dist < nearest_obstacle_distance:
+                    nearest_obstacle_distance = dist
+                    nearest_obstacle = obs
+            
+            if nearest_obstacle:
+                max_possible_distance = math.hypot(WIDTH, HEIGHT)
+                normalized_obstacle_distance = nearest_obstacle_distance / max_possible_distance
+                inputs.append(normalized_obstacle_distance)
+
+                # Vector from creature to obstacle's center (approximation)
+                obstacle_center_x = nearest_obstacle.x + nearest_obstacle.width / 2
+                obstacle_center_y = nearest_obstacle.y + nearest_obstacle.height / 2
+                obstacle_vector_x = obstacle_center_x - self.x
+                obstacle_vector_y = obstacle_center_y - self.y
+
+                creature_heading_x = math.cos(math.radians(self.direction))
+                creature_heading_y = math.sin(math.radians(self.direction))
+
+                dot_product = obstacle_vector_x * creature_heading_x + obstacle_vector_y * creature_heading_y
+                magnitude_obstacle = math.hypot(obstacle_vector_x, obstacle_vector_y)
+                magnitude_creature_heading = math.hypot(creature_heading_x, creature_heading_y)
+
+                if magnitude_obstacle > 0 and magnitude_creature_heading > 0:
+                    clamped_dot_prod_norm = max(-1.0, min(1.0, dot_product / (magnitude_obstacle * magnitude_creature_heading)))
+                    angle_rad = math.acos(clamped_dot_prod_norm)
+
+                    cross_product = creature_heading_x * obstacle_vector_y - creature_heading_y * obstacle_vector_x
+                    if cross_product < 0: # Obstacle is to the right
+                        angle_rad = -angle_rad
+                    
+                    normalized_obstacle_angle = angle_rad / math.pi
+                    inputs.append(normalized_obstacle_angle)
+                else:
+                    inputs.extend([0.0]) # No obstacle or no clear direction
+            else:
+                inputs.extend([0.0, 0.0]) # No obstacle found
+        else:
+            inputs.extend([0.0, 0.0]) # No obstacles in simulation
 
         return inputs
 
@@ -111,11 +166,11 @@ class Creature:
 
         return steering_force, burst_decision_raw
 
-    def move(self, food_items):
-        sensor_inputs = self.get_sensor_data(food_items)
+    def move(self, food_items, obstacles):
+        sensor_inputs = self.get_sensor_data(food_items, obstacles)
         steering_force, burst_decision_raw = self.think(sensor_inputs)
 
-        # --- Speed Burst Logic ---
+        #  Speed Burst Logic 
         # If not currently bursting and NN output suggests burst and has enough energy
         if not self.is_bursting and burst_decision_raw > BURST_NN_THRESHOLD and self.energy >= BURST_ENERGY_COST:
             self.energy -= BURST_ENERGY_COST
@@ -161,6 +216,69 @@ class Creature:
         # Energy decay
         if not self.is_dying:
             self.energy -= CREATURE_ENERGY_DECAY
+            
+        # --- Obstacle Collision Logic ---
+        collided = False
+        for obs in self.obstacles_ref:
+            if self.check_collision_with_obstacle(new_x, new_y, obs):
+                collided = True
+                self.energy -= OBSTACLE_PENALTY
+                self.energy = max(0, self.energy)
+
+                # Bounce off the obstacle by reversing direction
+                self.direction = (self.direction + 180) % 360
+                break
+
+        if not collided:
+            self.x = new_x
+            self.y = new_y
+        
+        # Boundary collision logic (still applies after obstacle check)
+        if self.x - self.radius < 0:
+            self.x = self.radius
+            self.direction = 180 - self.direction
+        elif self.x + self.radius > WIDTH:
+            self.x = WIDTH - self.radius
+            self.direction = 180 - self.direction
+
+        if self.y - self.radius < 0:
+            self.y = self.radius
+            self.direction = 360 - self.direction
+        elif self.y + self.radius > HEIGHT:
+            self.y = HEIGHT - self.radius
+            self.direction = 360 - self.direction
+
+        # Energy decay
+        if not self.is_dying:
+            self.energy -= CREATURE_ENERGY_DECAY
+        
+        # Set dying state if energy drops to 0
+        if self.energy <= 0 and not self.is_dying:
+            self.is_dying = True
+            self.fade_alpha = 255
+            
+    def check_collision_with_obstacle(self, pos_x, pos_y, obstacle):
+        """
+        Checks for circular creature colliding with rectangular obstacle.
+
+        Args:
+            pos_x (float): Proposed x-coordinate of the creature.
+            pos_y (float): Proposed y-coordinate of the creature.
+            obstacle (Obstacle): The obstacle to check collision against.
+
+        Returns:
+            bool: True if collision occurs, False otherwise.
+        """
+        # Find the closest point on the rectangle to the center of the circle
+        closest_x = max(obstacle.x, min(pos_x, obstacle.x + obstacle.width))
+        closest_y = max(obstacle.y, min(pos_y, obstacle.y + obstacle.height))
+
+        # Calculate the distance between the circle's center and this closest point
+        distance_x = pos_x - closest_x
+        distance_y = pos_y - closest_y
+        distance_squared = (distance_x * distance_x) + (distance_y * distance_y)
+
+        return distance_squared < (self.radius * self.radius)
 
 
     def draw(self, screen):
@@ -172,8 +290,8 @@ class Creature:
             screen.blit(s, (int(self.x - self.radius), int(self.y - self.radius)))
         else:
             pygame.draw.circle(screen, current_color, (int(self.x), int(self.y)), self.radius)
-            if self.is_bursting: # Draw a small dot or glow to indicate bursting
-                pygame.draw.circle(screen, (255, 255, 0), (int(self.x), int(self.y)), self.radius + 2, 1) # Yellow outline
+            if self.is_bursting:
+                pygame.draw.circle(screen, (255, 255, 0), (int(self.x), int(self.y)), self.radius + 2, 1)
 
 
         line_length = self.radius * 1.5
@@ -232,10 +350,11 @@ class Creature:
                         nn_weights_ih=offspring_weights_ih,
                         nn_biases_h=offspring_biases_h,
                         nn_weights_ho=offspring_weights_ho,
-                        nn_biases_o=offspring_biases_o)
+                        nn_biases_o=offspring_biases_o,
+                        obstacles_ref=self.obstacles_ref)
         
         
-# --- The Food Class (No changes needed here) ---
+#  The Food Class (No changes needed here) 
 class Food:
     def __init__(self):
         self.x = random.randint(0, WIDTH)
@@ -245,3 +364,67 @@ class Food:
 
     def draw(self, screen):
         pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
+        
+# Helper function (extracted from main and placed here as it's used by creatures)
+def is_position_safe(pos_x, pos_y, check_radius, obstacles_list):
+    """
+    Checks if a given position is safe for spawning (not too close to obstacles).
+
+    Args:
+        pos_x (float): X-coordinate to check.
+        pos_y (float): Y-coordinate to check.
+        check_radius (float): The radius around the point to check for collision.
+        obstacles_list (list): List of Obstacle objects in the world.
+
+    Returns:
+        bool: True if the position is safe, False otherwise.
+    """
+    if not obstacles_list: # If no obstacles, any position is safe
+        return True
+
+    for obs in obstacles_list:
+        # Find the closest point on the rectangle to the center of the circle
+        closest_x = max(obs.x, min(pos_x, obs.x + obs.width))
+        closest_y = max(obs.y, min(pos_y, obs.y + obs.height))
+
+        # Calculate the distance between the circle's center and this closest point
+        distance_x = pos_x - closest_x
+        distance_y = pos_y - closest_y
+        distance_squared = (distance_x * distance_x) + (distance_y * distance_y)
+
+        # If the distance squared is less than (check_radius + MIN_SPAWN_DISTANCE_FROM_OBSTACLE) squared,
+        # then it's too close.
+        # Ensure MIN_SPAWN_DISTANCE_FROM_OBSTACLE is defined in py
+        if distance_squared < (check_radius + MIN_SPAWN_DISTANCE_FROM_OBSTACLE)**2:
+            return False
+    return True
+
+# --- Obstacle Class ---
+class Obstacle:
+    """Represents a rectangular obstacle in the simulation."""
+    def __init__(self, x, y, width, height, color=OBSTACLE_COLOR):
+        """
+        Initializes a new obstacle.
+
+        Args:
+            x (int): X-coordinate of the top-left corner.
+            y (int): Y-coordinate of the top-left corner.
+            width (int): Width of the obstacle.
+            height (int): Height of the obstacle.
+            color (tuple, optional): RGB color tuple. Defaults to OBSTACLE_COLOR.
+        """
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.color = color
+        self.rect = pygame.Rect(x, y, width, height)
+        
+    def draw(self, screen_surface):
+        """
+        Draws the obstacle on the screen.
+
+        Args:
+            screen_surface (pygame.Surface): The surface to draw on.
+        """
+        pygame.draw.rect(screen_surface, self.color, self.rect)

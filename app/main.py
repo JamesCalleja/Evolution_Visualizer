@@ -4,11 +4,11 @@ import os
 import sys
 import argparse
 import random
+import math
 
 # Import components from your new modules
 import constants as const
-from nn import tanh
-from creatures import Creature, Food 
+from creatures import Creature, Food, Obstacle 
 
 # from creatures import Creature, Food, Obstacle, is_position_safe
 # from utils import initialize_obstacles
@@ -73,13 +73,71 @@ total_bursts_activated_gen = 0
 total_burst_energy_spent_gen = 0
 
 
-def create_initial_population(count):
+def create_initial_population(count, obstacles):
     new_population = []
     for _ in range(count):
-        new_population.append(Creature())
+        # Pass obstacles_ref to Creature constructor
+        new_population.append(Creature(obstacles_ref=obstacles))
     return new_population
 
-creatures = create_initial_population(const.INITIAL_CREATURE_COUNT)
+def initialize_obstacles(num_obstacles, width, height, obstacle_size, min_spawn_distance, creatures=None, food_items=None):
+    """
+    Initializes a list of non-overlapping obstacles, ensuring they don't
+    spawn too close to creatures or food if provided.
+    """
+    new_obstacles = []
+    for _ in range(num_obstacles):
+        while True:
+            obs_x = random.randint(0, width - obstacle_size)
+            obs_y = random.randint(0, height - obstacle_size)
+            new_obs = Obstacle(obs_x, obs_y, obstacle_size, obstacle_size)
+
+            # Check for overlap with existing obstacles
+            overlap = False
+            for existing_obs in new_obstacles:
+                if (obs_x < existing_obs.x + existing_obs.width and
+                    obs_x + obstacle_size > existing_obs.x and
+                    obs_y < existing_obs.y + existing_obs.height and
+                    obs_y + obstacle_size > existing_obs.y):
+                    overlap = True
+                    break
+            if overlap:
+                continue
+
+            # Check for overlap with creatures (if provided)
+            if creatures:
+                for creature in creatures:
+                    # Simple circle-rect collision for creature-obstacle during spawn
+                    closest_x = max(new_obs.x, min(creature.x, new_obs.x + new_obs.width))
+                    closest_y = max(new_obs.y, min(creature.y, new_obs.y + new_obs.height))
+                    distance = math.hypot(creature.x - closest_x, creature.y - closest_y)
+                    if distance < creature.radius + min_spawn_distance:
+                        overlap = True
+                        break
+            if overlap:
+                continue
+
+            # Check for overlap with food (if provided)
+            if food_items:
+                for food in food_items:
+                    closest_x = max(new_obs.x, min(food.x, new_obs.x + new_obs.width))
+                    closest_y = max(new_obs.y, min(food.y, new_obs.y + new_obs.height))
+                    distance = math.hypot(food.x - closest_x, food.y - closest_y)
+                    if distance < food.radius + min_spawn_distance:
+                        overlap = True
+                        break
+            if overlap:
+                continue
+
+            new_obstacles.append(new_obs)
+            break
+    return new_obstacles
+
+# Initialize obstacles
+obstacles = initialize_obstacles(const.NUM_OBSTACLES, const.WIDTH, const.HEIGHT, const.OBSTACLE_SIZE, const.MIN_SPAWN_DISTANCE_FROM_OBSTACLE)
+
+# Pass the obstacles list when creating initial population
+creatures = create_initial_population(const.INITIAL_CREATURE_COUNT, obstacles)
 
 # --- Logging Setup ---
 log_file = None
@@ -120,7 +178,8 @@ while running:
                     log_file.close()
 
                 # Reset all game state variables
-                creatures = create_initial_population(const.INITIAL_CREATURE_COUNT)
+                obstacles = initialize_obstacles(const.NUM_OBSTACLES, const.WIDTH, const.HEIGHT, const.OBSTACLE_SIZE, const.MIN_SPAWN_DISTANCE_FROM_OBSTACLE)
+                creatures = create_initial_population(const.INITIAL_CREATURE_COUNT, obstacles)
                 food_items = []
                 food_eaten_count = 0
                 food_eaten_this_generation = 0
@@ -195,7 +254,7 @@ while running:
             new_generation_creatures = []
             if not survivors:
                 print(f"Gen {current_generation-1}: No survivors from previous generation. Re-initializing population.")
-                new_generation_creatures = create_initial_population(const.INITIAL_CREATURE_COUNT)
+                new_generation_creatures = create_initial_population(const.INITIAL_CREATURE_COUNT, obstacles)
             else:
                 # Fill remaining spots with offspring from survivors
                 for _ in range(const.INITIAL_CREATURE_COUNT): # Ensure fixed population size
@@ -208,7 +267,20 @@ while running:
 
             creatures = []
             creatures.extend(new_generation_creatures)
-            food_items = [] # Clear food for a clean start
+            food_items = [] 
+            
+            obstacles = []
+            obstacles = initialize_obstacles(
+                const.NUM_OBSTACLES,
+                const.WIDTH,
+                const.HEIGHT,
+                const.OBSTACLE_SIZE,
+                const.MIN_SPAWN_DISTANCE_FROM_OBSTACLE,
+                creatures=creatures,
+                food_items=food_items)
+            
+            for creature in creatures:
+                creature.obstacles_ref = obstacles
 
             food_eaten_this_generation = 0
             # --- NEW: Reset burst counters for the new generation ---
@@ -227,7 +299,7 @@ while running:
         creatures_to_remove_after_fade = []
 
         for creature in list(creatures):
-            creature.move(food_items)
+            creature.move(food_items, obstacles )
 
             eaten = creature.eat_food(food_items)
             for food in eaten:
@@ -259,9 +331,14 @@ while running:
 
     for food in food_items:
         food.draw(screen)
+        
+    for obs in obstacles:
+        obs.draw(screen)
 
     for creature in creatures:
-        creature.draw(screen)
+            if not creature.is_dying:
+                creature.draw(screen)
+                creature.move(food_items, obstacles)
 
     # --- UI/Info Panel ---
     population_text = font.render(f"Population: {len(creatures)}", True, const.WHITE)
