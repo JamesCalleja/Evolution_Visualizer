@@ -276,8 +276,11 @@ while running:
                 const.HEIGHT,
                 const.OBSTACLE_SIZE,
                 const.MIN_SPAWN_DISTANCE_FROM_OBSTACLE,
-                creatures=creatures, # Pass current creatures
+                creatures=creatures,
                 food_items=food_items)
+            
+            for creature in creatures:
+                creature.obstacles_ref = obstacles
 
             food_eaten_this_generation = 0
             # --- NEW: Reset burst counters for the new generation ---
