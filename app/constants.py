@@ -1,7 +1,7 @@
 import os
 import argparse
 
-# --- 1. Constants and Configuration ---
+#  1. Constants and Configuration 
 # Define default values for your constants. These will be used if no command-line arguments are provided.
 DEFAULT_WIDTH, DEFAULT_HEIGHT = 1000, 700
 DEFAULT_FPS = 60
@@ -22,7 +22,7 @@ DEFAULT_MUTATION_CHANCE = 0.02
 DEFAULT_NN_MUTATION_AMOUNT = 0.1
 DEFAULT_COLOR_MUTATION_AMOUNT = 30
 
-# --- NEW: Speed Burst Constants ---
+#  NEW: Speed Burst Constants 
 BURST_ENERGY_COST = 10     # Energy consumed for one burst
 BURST_SPEED_MULTIPLIER = 1.8 # How much faster they move (e.g., 1.8x base speed)
 BURST_DURATION_FRAMES = 10 # How many frames the burst lasts
@@ -44,13 +44,25 @@ DEFAULT_CREATURE_MAX_ENERGY = 100
 DEFAULT_FOOD_LIMIT_PER_GENERATION = 50
 
 # Logging Configuration Defaults
-DEFAULT_LOG_DIRECTORY = "../simulation_logs"
+DEFAULT_LOG_DIRECTORY = "..\simulation_logs"
 DEFAULT_LOG_ENABLED = True
 LIVE_LOG_FILE_NAME = "evolution_live_log.csv"
 log_filepath = os.path.join(DEFAULT_LOG_DIRECTORY, LIVE_LOG_FILE_NAME)
 
+#  Obstacle Settings 
+OBSTACLE_PENALTY = 2       # Energy lost per collision with an obstacle
+OBSTACLE_SIZE = 25 # Size of square obstacles (if you use fixed size obstacles)
+NUM_OBSTACLES = 3 # Number of obstacles to generate
+OBSTACLE_COLOR = (100, 100, 150)
 
-# --- Argument Parsing ---
+#  Breeding and Fitness Metrics 
+COLLISION_PENALTY_BREEDING = 1.0 # Points subtracted from fitness for each collision
+
+#  Spawn Safety 
+MIN_SPAWN_DISTANCE_FROM_OBSTACLE = 25 # Minimum distance from obstacle edges for spawning
+
+
+#  Argument Parsing 
 parser = argparse.ArgumentParser(description="Evolution Simulator (Pygame).")
 
 parser.add_argument('--width', type=int, default=DEFAULT_WIDTH, help=f"Window width (default: {DEFAULT_WIDTH})")
@@ -88,7 +100,7 @@ parser.add_argument('--log_enabled', type=int, default=int(DEFAULT_LOG_ENABLED),
 
 args = parser.parse_args()
 
-# --- Assign values from parsed arguments to constants ---
+#  Assign values from parsed arguments to constants 
 WIDTH, HEIGHT = args.width, args.height
 FPS = args.fps
 
