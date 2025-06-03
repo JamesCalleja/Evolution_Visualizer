@@ -14,10 +14,10 @@ DEFAULT_PARAMS = {
     'mutation_chance': 0.02,
     'nn_mutation_amount': 0.1,
     'color_mutation_amount': 30,
-    'generation_length_frames': 5000,
+    'generation_length_frames': 500,
     'selection_percentage': 0.3,
     'creature_max_energy': 100.0,
-    'food_limit_per_generation': 500,
+    'food_limit_per_generation': 50,
     'log_enabled': True,
     'width': 1000,
     'height': 700,
@@ -145,7 +145,7 @@ class EvolutionSimulatorGUI(tk.Tk):
                     messagebox.showwarning("Warning", f"python.exe not found at {python_exe}. Trying default sys.executable.")
                     python_exe = sys.executable
 
-            command = [python_exe, 'evolution_visualizer.py'] + params
+            command = [python_exe, 'main.py'] + params
             print(f"Executing simulation command: {' '.join(command)}")
             print("--- Simulation Output (if any) ---")
 
