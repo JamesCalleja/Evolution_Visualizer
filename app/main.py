@@ -149,16 +149,13 @@ if const.LOG_ENABLED:
     log_writer = csv.writer(log_file)
     # --- UPDATED CSV HEADER ---
     log_writer.writerow([
-        "Generation",
-        "Food_Eaten_Gen",
-        "Top_Creature_Food_Eaten",
-        "Num_Survivors",
-        "Population_Size_Start_Gen",
-        "Avg_Survivor_Energy",
-        "Total_Bursts_Activated_Gen", # NEW
-        "Total_Burst_Energy_Spent_Gen", # NEW
-        "Frames_This_Gen"
-    ])
+                "Generation", "Food_Eaten_Gen", "Top_Creature_Food_Eaten",
+                "Num_Survivors", "Population_Size_Start_Gen", "Avg_Survivor_Energy",
+                "Total_Bursts_Activated_Gen",
+                "Total_Burst_Energy_Spent_Gen",
+                "Avg_Fitness",
+                "Frames_This_Gen"
+            ])
     print(f"Logging to: {const.log_filepath}")
 else:
     print("Logging is disabled.")
@@ -197,15 +194,16 @@ while running:
                     log_writer = csv.writer(log_file)
                     # --- UPDATED CSV HEADER for restart ---
                     log_writer.writerow([
-                        "Generation",
-                        "Food_Eaten_Gen",
-                        "Top_Creature_Food_Eaten",
-                        "Num_Survivors",
-                        "Population_Size_Start_Gen",
-                        "Avg_Survivor_Energy",
-                        "Total_Bursts_Activated_Gen", # NEW
-                        "Total_Burst_Energy_Spent_Gen", # NEW
-                        "Frames_This_Gen"
+                        current_generation,
+                        food_eaten_this_generation,
+                        top_creature_food_eaten,
+                        len(survivors_for_log_list),
+                        len(creatures),
+                        f"{avg_survivor_energy:.2f}",
+                        total_bursts_activated_gen,
+                        total_burst_energy_spent_gen,
+                        f"{avg_survivor_fitness:.2f}", # NEW: Average Fitness
+                        frame_count_this_generation
                     ])
                     print(f"Logging to: {const.log_filepath}")
 
@@ -221,22 +219,29 @@ while running:
                 living_creatures_for_log = [c for c in creatures if not c.is_dying]
                 living_creatures_for_log.sort(key=lambda c: c.food_eaten_individual, reverse=True)
 
-                top_creature_food = living_creatures_for_log[0].food_eaten_individual if living_creatures_for_log else 0
-
+                top_creature_food_eaten = living_creatures_for_log[0].food_eaten_individual if living_creatures_for_log else 0
+                
+                # --- MOVE THESE LINES UP ---
                 num_survivors_for_log = max(1, int(len(living_creatures_for_log) * const.SELECTION_PERCENTAGE))
+                survivors_for_log_list = []
                 survivors_for_log_list = living_creatures_for_log[:num_survivors_for_log]
+                # --- END OF MOVE ---
+
+                # Calculate average fitness (this line caused the error)
+                avg_survivor_fitness = sum(c.calculate_fitness() for c in survivors_for_log_list) / len(survivors_for_log_list) if survivors_for_log_list else 0
 
                 avg_survivor_energy = sum(c.energy for c in survivors_for_log_list) / len(survivors_for_log_list) if survivors_for_log_list else 0
 
                 log_writer.writerow([
                     current_generation,
                     food_eaten_this_generation,
-                    top_creature_food,
+                    top_creature_food_eaten,
                     len(survivors_for_log_list),
                     len(creatures),
                     f"{avg_survivor_energy:.2f}",
-                    total_bursts_activated_gen, # NEW
-                    total_burst_energy_spent_gen, # NEW
+                    total_bursts_activated_gen,
+                    total_burst_energy_spent_gen,
+                    f"{avg_survivor_fitness:.2f}",
                     frame_count_this_generation
                 ])
                 log_file.flush()
@@ -246,18 +251,43 @@ while running:
 
             # 1. Selection
             living_creatures_for_selection = [c for c in creatures if not c.is_dying]
-            living_creatures_for_selection.sort(key=lambda c: c.food_eaten_individual, reverse=True)
+            living_creatures_for_selection.sort(key=lambda c: c.calculate_fitness(), reverse=True) 
 
             num_survivors = max(1, int(len(living_creatures_for_selection) * const.SELECTION_PERCENTAGE))
             survivors = living_creatures_for_selection[:num_survivors]
 
             new_generation_creatures = []
             if not survivors:
-                print(f"Gen {current_generation-1}: No survivors from previous generation. Re-initializing population.")
-                new_generation_creatures = create_initial_population(const.INITIAL_CREATURE_COUNT, obstacles)
+                # Fallback mechanism: Select based on food eaten if no fitness-based survivors
+                print(f"Gen {current_generation-1}: No fitness-based survivors. Selecting creatures based on food eaten for breeding.")
+                
+                # Consider all creatures from the just-finished generation (even those dying but with stats)
+                # The 'creatures' list here still holds the creatures from the just-finished generation.
+                all_creatures_past_gen_sorted_by_food = sorted(creatures, key=lambda c: c.food_eaten_individual, reverse=True)
+                
+                fallback_num_breeders = max(1, int(len(all_creatures_past_gen_sorted_by_food) * const.SELECTION_PERCENTAGE))
+                fallback_breeders = all_creatures_past_gen_sorted_by_food[:fallback_num_breeders]
+                
+                # Use these fallback breeders to create the new generation
+                for _ in range(const.INITIAL_CREATURE_COUNT):
+                    # Ensure there are breeders to choose from
+                    if not fallback_breeders:
+                        print(f"Gen {current_generation-1}: No fallback breeders found. Breaking reproduction loop.")
+                        break
+                    parent = random.choice(fallback_breeders)
+                    offspring = parent.reproduce()
+                    if offspring:
+                        new_generation_creatures.append(offspring)
+                        if len(new_generation_creatures) >= const.INITIAL_CREATURE_COUNT:
+                            break
+                
+                # If even with fallback, no offspring are produced (e.g., fallback_breeders is empty or reproduce fails)
+                if not new_generation_creatures:
+                    print(f"Gen {current_generation-1}: No creatures selected even with food-based fallback. Re-initializing population.")
+                    new_generation_creatures = create_initial_population(const.INITIAL_CREATURE_COUNT, obstacles)
             else:
-                # Fill remaining spots with offspring from survivors
-                for _ in range(const.INITIAL_CREATURE_COUNT): # Ensure fixed population size
+                # Fill remaining spots with offspring from fitness-based survivors
+                for _ in range(const.INITIAL_CREATURE_COUNT):
                     parent = random.choice(survivors)
                     offspring = parent.reproduce()
                     if offspring:

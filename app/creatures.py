@@ -1,20 +1,16 @@
 import pygame
-import sys
 import random
 import math
-import datetime
-import os
-import csv
-import argparse
 
 from constants import (WIDTH, HEIGHT, WHITE, CREATURE_ENERGY_DECAY,
                        CREATURE_RADIUS, CREATURE_MAX_ENERGY,
                        NN_HIDDEN_NODES, NN_INPUT_NODES, NN_OUTPUT_NODES,
-                       NN_MUTATION_AMOUNT,
+                       NN_MUTATION_AMOUNT, COLLISION_PENALTY_BREEDING, BURST_NN_THRESHOLD,
                        BURST_NN_THRESHOLD, BURST_ENERGY_COST, BURST_DURATION_FRAMES, BURST_SPEED_MULTIPLIER,
-                       FOOD_ENERGY_GAIN, FOOD_RADIUS, FOOD_COLOR, COLOR_MUTATION_AMOUNT, MUTATION_CHANCE,
+                       BURST_FITNESS_BONUS, FOOD_ENERGY_GAIN, FOOD_RADIUS, 
+                       FOOD_COLOR, COLOR_MUTATION_AMOUNT, MUTATION_CHANCE,
                        MIN_SPAWN_DISTANCE_FROM_OBSTACLE, OBSTACLE_PENALTY, OBSTACLE_COLOR)
-from nn import tanh  # Assuming nn.py contains the tanh function
+from nn import tanh
 
 
 #  The Creature Class 
@@ -49,6 +45,12 @@ class Creature:
         
         # Reference to obstacles (if any)
         self.obstacles_ref = obstacles_ref # Store the reference to obstacles
+        
+        # Individual creature stats for fitness calculation and logging
+        self.food_eaten_individual = 0
+        self.collisions_individual = 0
+        self.bursts_activated_individual = 0
+        self.burst_energy_spent_individual = 0
 
 
     def get_sensor_data(self, food_items, obstacles):
@@ -312,6 +314,16 @@ class Creature:
                 self.food_eaten_individual += 1
                 eaten_food.append(food)
         return eaten_food
+    
+    def calculate_fitness(self):
+        """
+        Calculates the creature's fitness based on food eaten,
+        collisions, and bursts activated.
+        """
+        fitness = self.food_eaten_individual * FOOD_ENERGY_GAIN
+        fitness -= self.collisions_individual * COLLISION_PENALTY_BREEDING
+        fitness += self.bursts_activated_individual * BURST_FITNESS_BONUS
+        return max(0, fitness)
 
     def reproduce(self):
         offspring_color = list(self.color)

@@ -22,11 +22,12 @@ DEFAULT_MUTATION_CHANCE = 0.02
 DEFAULT_NN_MUTATION_AMOUNT = 0.1
 DEFAULT_COLOR_MUTATION_AMOUNT = 30
 
-#  NEW: Speed Burst Constants 
-BURST_ENERGY_COST = 10     # Energy consumed for one burst
-BURST_SPEED_MULTIPLIER = 1.8 # How much faster they move (e.g., 1.8x base speed)
-BURST_DURATION_FRAMES = 10 # How many frames the burst lasts
-BURST_NN_THRESHOLD = 0.5   # NN output must exceed this to trigger burst (for tanh output, range -1 to 1)
+# --- Speed Burst Constants ---
+BURST_ENERGY_COST = 10.0
+BURST_DURATION_FRAMES = 60 # How many frames the burst lasts
+BURST_NN_THRESHOLD = 0.5  # NN output must exceed this to trigger burst (tanh output)
+BURST_FITNESS_BONUS = 5.0 # Bonus to fitness for each burst activated
+BURST_SPEED_MULTIPLIER = 1.8 # e.g., 1.8x base speed
 
 
 # Neural Network Architecture Constants
@@ -44,7 +45,7 @@ DEFAULT_CREATURE_MAX_ENERGY = 100
 DEFAULT_FOOD_LIMIT_PER_GENERATION = 50
 
 # Logging Configuration Defaults
-DEFAULT_LOG_DIRECTORY = "..\simulation_logs"
+DEFAULT_LOG_DIRECTORY = "../simulation_logs"
 DEFAULT_LOG_ENABLED = True
 LIVE_LOG_FILE_NAME = "evolution_live_log.csv"
 log_filepath = os.path.join(DEFAULT_LOG_DIRECTORY, LIVE_LOG_FILE_NAME)
