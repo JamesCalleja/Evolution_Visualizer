@@ -8,7 +8,6 @@ import math
 
 # Import components from your new modules
 import constants as const
-from nn import tanh
 from creatures import Creature, Food, Obstacle 
 
 # from creatures import Creature, Food, Obstacle, is_position_safe
@@ -268,7 +267,17 @@ while running:
 
             creatures = []
             creatures.extend(new_generation_creatures)
-            food_items = [] # Clear food for a clean start
+            food_items = [] 
+            
+            obstacles = []
+            obstacles = initialize_obstacles(
+                const.NUM_OBSTACLES,
+                const.WIDTH,
+                const.HEIGHT,
+                const.OBSTACLE_SIZE,
+                const.MIN_SPAWN_DISTANCE_FROM_OBSTACLE,
+                creatures=creatures, # Pass current creatures
+                food_items=food_items)
 
             food_eaten_this_generation = 0
             # --- NEW: Reset burst counters for the new generation ---
@@ -325,6 +334,7 @@ while running:
 
     for creature in creatures:
             if not creature.is_dying:
+                creature.draw(screen)
                 creature.move(food_items, obstacles)
 
     # --- UI/Info Panel ---
