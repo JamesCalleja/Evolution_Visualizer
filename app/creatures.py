@@ -24,6 +24,7 @@ class Creature:
         self.radius = CREATURE_RADIUS
         self.color = color if color is not None else (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255))
         self.energy = energy if energy is not None else CREATURE_MAX_ENERGY
+        self.bursts_this_generation = 0
 
         self.speed = 1.5 # Base speed
         self.direction = random.uniform(0, 360)
@@ -183,6 +184,7 @@ class Creature:
             self.burst_frames_left = BURST_DURATION_FRAMES
             self.bursts_activated_individual += 1 # Increment individual burst count
             self.energy_spent_bursting_individual += BURST_ENERGY_COST # Track individual energy spent
+            self.bursts_this_generation += 1
 
         current_speed = self.speed
         if self.is_bursting:
