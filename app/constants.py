@@ -28,6 +28,7 @@ BURST_DURATION_FRAMES = 60 # How many frames the burst lasts
 BURST_NN_THRESHOLD = 0.5  # NN output must exceed this to trigger burst (tanh output)
 BURST_FITNESS_BONUS = 5.0 # Bonus to fitness for each burst activated
 BURST_SPEED_MULTIPLIER = 1.8 # e.g., 1.8x base speed
+MAX_BURSTS_PER_GENERATION = 2 # Maximum bursts a creature can perform in one generation
 
 
 # Neural Network Architecture Constants
