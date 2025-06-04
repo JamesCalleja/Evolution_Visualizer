@@ -6,18 +6,19 @@ from constants import (WIDTH, HEIGHT, WHITE, CREATURE_ENERGY_DECAY,
                        CREATURE_RADIUS, CREATURE_MAX_ENERGY,
                        NN_HIDDEN_NODES, NN_INPUT_NODES, NN_OUTPUT_NODES,
                        NN_MUTATION_AMOUNT, COLLISION_PENALTY_BREEDING, BURST_NN_THRESHOLD,
-                       BURST_NN_THRESHOLD, MAX_BURSTS_PER_GENERATION, BURST_ENERGY_COST, 
-                       BURST_DURATION_FRAMES, BURST_SPEED_MULTIPLIER,
-                       BURST_FITNESS_BONUS, FOOD_ENERGY_GAIN, FOOD_RADIUS, 
+                       BURST_ENERGY_COST, BURST_DURATION_FRAMES, BURST_SPEED_MULTIPLIER,
+                       BURST_FITNESS_BONUS, FOOD_ENERGY_GAIN, FOOD_RADIUS,
                        FOOD_COLOR, COLOR_MUTATION_AMOUNT, MUTATION_CHANCE,
-                       MIN_SPAWN_DISTANCE_FROM_OBSTACLE, OBSTACLE_PENALTY, OBSTACLE_COLOR)
+                       MIN_SPAWN_DISTANCE_FROM_OBSTACLE, OBSTACLE_PENALTY, OBSTACLE_COLOR,
+                       TURNING_RATE, MIN_TURNING_RATE, MAX_TURNING_RATE, TURNING_RATE_MUTATION_AMOUNT) # NEW IMPORTS
 from nn import tanh
 
 
-#  The Creature Class 
+#  The Creature Class
 class Creature:
     def __init__(self, x=None, y=None, color=None, energy=None,
-                 nn_weights_ih=None, nn_biases_h=None, nn_weights_ho=None, nn_biases_o=None, obstacles_ref=None,):
+                 nn_weights_ih=None, nn_biases_h=None, nn_weights_ho=None, nn_biases_o=None,
+                 obstacles_ref=None, turning_rate=None):
         self.x = x if x is not None else random.randint(0, WIDTH)
         self.y = y if y is not None else random.randint(0, HEIGHT)
         self.radius = CREATURE_RADIUS
@@ -26,19 +27,17 @@ class Creature:
 
         self.speed = 1.5 # Base speed
         self.direction = random.uniform(0, 360)
+        self.turning_rate = turning_rate if turning_rate is not None else random.uniform(MIN_TURNING_RATE, MAX_TURNING_RATE) # Initialize turning rate
 
         self.is_dying = False
         self.fade_alpha = 255
         self.food_eaten_individual = 0
 
-        #  NEW: Burst State 
+        #  NEW: Burst State
         self.is_bursting = False
         self.burst_frames_left = 0
         self.bursts_activated_individual = 0 # Track individual bursts
         self.energy_spent_bursting_individual = 0 # Track individual energy spent on bursts
-        self.bursts_used_this_generation = 0
-        self.is_bursting = False # Ensure this is initialized
-        self.burst_timer = 0
 
 
         # Neural network initialization
@@ -46,10 +45,10 @@ class Creature:
         self.biases_h = [random.uniform(-1, 1) for _ in range(NN_HIDDEN_NODES)] if nn_biases_h is None else nn_biases_h
         self.weights_ho = [[random.uniform(-1, 1) for _ in range(NN_OUTPUT_NODES)] for _ in range(NN_HIDDEN_NODES)] if nn_weights_ho is None else nn_weights_ho
         self.biases_o = [random.uniform(-1, 1) for _ in range(NN_OUTPUT_NODES)] if nn_biases_o is None else nn_biases_o
-        
+
         # Reference to obstacles (if any)
         self.obstacles_ref = obstacles_ref # Store the reference to obstacles
-        
+
         # Individual creature stats for fitness calculation and logging
         self.food_eaten_individual = 0
         self.collisions_individual = 0
@@ -100,7 +99,7 @@ class Creature:
 
         normalized_angle = nearest_food_angle / 130.0
         inputs.append(normalized_angle)
-        
+
         # 4. Nearest Obstacle Data (Normalized Distance and Angle)
         nearest_obstacle_distance = math.hypot(WIDTH, HEIGHT) + 1
         nearest_obstacle_angle = 0.0
@@ -116,7 +115,7 @@ class Creature:
                 if dist < nearest_obstacle_distance:
                     nearest_obstacle_distance = dist
                     nearest_obstacle = obs
-            
+
             if nearest_obstacle:
                 max_possible_distance = math.hypot(WIDTH, HEIGHT)
                 normalized_obstacle_distance = nearest_obstacle_distance / max_possible_distance
@@ -142,7 +141,7 @@ class Creature:
                     cross_product = creature_heading_x * obstacle_vector_y - creature_heading_y * obstacle_vector_x
                     if cross_product < 0: # Obstacle is to the right
                         angle_rad = -angle_rad
-                    
+
                     normalized_obstacle_angle = angle_rad / math.pi
                     inputs.append(normalized_obstacle_angle)
                 else:
@@ -176,23 +175,14 @@ class Creature:
         sensor_inputs = self.get_sensor_data(food_items, obstacles)
         steering_force, burst_decision_raw = self.think(sensor_inputs)
 
-        #  Speed Burst Logic 
+        #  Speed Burst Logic
         # If not currently bursting and NN output suggests burst and has enough energy
-        
-        # ... (inside Creature.move, where burst decision is made)
-        # (Removed erroneous burst_output usage; logic handled below with burst_decision_raw)
-        
-        if (not self.is_bursting and
-                burst_decision_raw > BURST_NN_THRESHOLD and
-                self.energy >= BURST_ENERGY_COST and
-                self.bursts_used_this_generation < MAX_BURSTS_PER_GENERATION): #
-            self.energy -= BURST_ENERGY_COST #
-            self.is_bursting = True #
-            self.burst_frames_left = BURST_DURATION_FRAMES #
+        if not self.is_bursting and burst_decision_raw > BURST_NN_THRESHOLD and self.energy >= BURST_ENERGY_COST:
+            self.energy -= BURST_ENERGY_COST
+            self.is_bursting = True
+            self.burst_frames_left = BURST_DURATION_FRAMES
             self.bursts_activated_individual += 1 # Increment individual burst count
             self.energy_spent_bursting_individual += BURST_ENERGY_COST # Track individual energy spent
-            self.bursts_used_this_generation += 1 # Increment the counter for this generation
-
 
         current_speed = self.speed
         if self.is_bursting:
@@ -202,7 +192,7 @@ class Creature:
                 self.is_bursting = False
 
         # Apply current_speed for movement
-        self.direction += steering_force * 7 # Max turn angle
+        self.direction += steering_force * self.turning_rate # Use self.turning_rate here
         self.direction = self.direction % 360
 
         direction_vector = pygame.math.Vector2.from_polar((1, self.direction))
@@ -231,7 +221,7 @@ class Creature:
         # Energy decay
         if not self.is_dying:
             self.energy -= CREATURE_ENERGY_DECAY
-            
+
         # --- Obstacle Collision Logic ---
         collided = False
         for obs in self.obstacles_ref:
@@ -247,7 +237,7 @@ class Creature:
         if not collided:
             self.x = new_x
             self.y = new_y
-        
+
         # Boundary collision logic (still applies after obstacle check)
         if self.x - self.radius < 0:
             self.x = self.radius
@@ -266,12 +256,12 @@ class Creature:
         # Energy decay
         if not self.is_dying:
             self.energy -= CREATURE_ENERGY_DECAY
-        
+
         # Set dying state if energy drops to 0
         if self.energy <= 0 and not self.is_dying:
             self.is_dying = True
             self.fade_alpha = 255
-            
+
     def check_collision_with_obstacle(self, pos_x, pos_y, obstacle):
         """
         Checks for circular creature colliding with rectangular obstacle.
@@ -327,7 +317,7 @@ class Creature:
                 self.food_eaten_individual += 1
                 eaten_food.append(food)
         return eaten_food
-    
+
     def calculate_fitness(self):
         """
         Calculates the creature's fitness based on food eaten,
@@ -336,6 +326,7 @@ class Creature:
         fitness = self.food_eaten_individual * FOOD_ENERGY_GAIN
         fitness -= self.collisions_individual * COLLISION_PENALTY_BREEDING
         fitness += self.bursts_activated_individual * BURST_FITNESS_BONUS
+        # Consider adding a small bonus/penalty for turning rate if desired
         return max(0, fitness)
 
     def reproduce(self):
@@ -345,6 +336,13 @@ class Creature:
             if random.random() < MUTATION_CHANCE:
                 offspring_color[i] += random.uniform(-COLOR_MUTATION_AMOUNT, COLOR_MUTATION_AMOUNT)
                 offspring_color[i] = max(0, min(255, int(offspring_color[i])))
+
+        # Mutate turning rate
+        offspring_turning_rate = self.turning_rate
+        if random.random() < MUTATION_CHANCE:
+            offspring_turning_rate += random.uniform(-TURNING_RATE_MUTATION_AMOUNT, TURNING_RATE_MUTATION_AMOUNT)
+            offspring_turning_rate = max(MIN_TURNING_RATE, min(MAX_TURNING_RATE, offspring_turning_rate)) # Clamp within bounds
+
 
         offspring_weights_ih = [row[:] for row in self.weights_ih]
         offspring_biases_h = self.biases_h[:]
@@ -376,10 +374,10 @@ class Creature:
                         nn_biases_h=offspring_biases_h,
                         nn_weights_ho=offspring_weights_ho,
                         nn_biases_o=offspring_biases_o,
-                        obstacles_ref=self.obstacles_ref)
-        
-        
-#  The Food Class (No changes needed here) 
+                        obstacles_ref=self.obstacles_ref,
+                        turning_rate=offspring_turning_rate) # Pass the new turning_rate
+
+#  The Food Class (No changes needed here)
 class Food:
     def __init__(self):
         self.x = random.randint(0, WIDTH)
@@ -389,7 +387,7 @@ class Food:
 
     def draw(self, screen):
         pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
-        
+
 # Helper function (extracted from main and placed here as it's used by creatures)
 def is_position_safe(pos_x, pos_y, check_radius, obstacles_list):
     """
@@ -444,7 +442,7 @@ class Obstacle:
         self.height = height
         self.color = color
         self.rect = pygame.Rect(x, y, width, height)
-        
+
     def draw(self, screen_surface):
         """
         Draws the obstacle on the screen.

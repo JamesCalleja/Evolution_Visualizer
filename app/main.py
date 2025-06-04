@@ -107,13 +107,14 @@ if const.LOG_ENABLED:
     log_writer = csv.writer(log_file)
     # --- UPDATED CSV HEADER ---
     log_writer.writerow([
-                "Generation", "Food_Eaten_Gen", "Top_Creature_Food_Eaten",
-                "Num_Survivors", "Population_Size_Start_Gen", "Avg_Survivor_Energy",
-                "Total_Bursts_Activated_Gen",
-                "Total_Burst_Energy_Spent_Gen",
-                "Avg_Fitness",
-                "Frames_This_Gen"
-            ])
+                        "Generation", "Food_Eaten_Gen", "Top_Creature_Food_Eaten",
+                        "Num_Survivors", "Population_Size_Start_Gen", "Avg_Survivor_Energy",
+                        "Total_Bursts_Activated_Gen",
+                        "Total_Burst_Energy_Spent_Gen",
+                        "Avg_Fitness",
+                        "Avg_Turning_Rate", # NEW: Average Turning Rate
+                        "Frames_This_Gen"
+                    ])
     print(f"Logging to: {const.log_filepath}")
 else:
     print("Logging is disabled.")
@@ -160,7 +161,8 @@ while running:
                         f"{avg_survivor_energy:.2f}",
                         total_bursts_activated_gen,
                         total_burst_energy_spent_gen,
-                        f"{avg_survivor_fitness:.2f}", # NEW: Average Fitness
+                        f"{avg_survivor_fitness:.2f}",
+                        f"{0.0:.2f}",  # avg_turning_rate placeholder
                         frame_count_this_generation
                     ])
                     print(f"Logging to: {const.log_filepath}")
@@ -190,6 +192,12 @@ while running:
 
                 avg_survivor_energy = sum(c.energy for c in survivors_for_log_list) / len(survivors_for_log_list) if survivors_for_log_list else 0
 
+                # Calculate average turning rate (if attribute exists)
+                if survivors_for_log_list and hasattr(survivors_for_log_list[0], "turning_rate"):
+                    avg_turning_rate = sum(getattr(c, "turning_rate", 0) for c in survivors_for_log_list) / len(survivors_for_log_list)
+                else:
+                    avg_turning_rate = 0.0
+
                 log_writer.writerow([
                     current_generation,
                     food_eaten_this_generation,
@@ -200,6 +208,7 @@ while running:
                     total_bursts_activated_gen,
                     total_burst_energy_spent_gen,
                     f"{avg_survivor_fitness:.2f}",
+                    f"{avg_turning_rate:.2f}",
                     frame_count_this_generation
                 ])
                 log_file.flush()
