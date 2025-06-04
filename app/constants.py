@@ -1,7 +1,7 @@
 import os
 import argparse
 
-#  1. Constants and Configuration 
+#  1. Constants and Configuration
 # Define default values for your constants. These will be used if no command-line arguments are provided.
 DEFAULT_WIDTH, DEFAULT_HEIGHT = 1000, 700
 DEFAULT_FPS = 60
@@ -26,8 +26,14 @@ DEFAULT_COLOR_MUTATION_AMOUNT = 30
 BURST_ENERGY_COST = 10.0
 BURST_DURATION_FRAMES = 60 # How many frames the burst lasts
 BURST_NN_THRESHOLD = 0.5  # NN output must exceed this to trigger burst (tanh output)
-BURST_FITNESS_BONUS = 5.0 # Bonus to fitness for each burst activated
+BURST_FITNESS_BONUS = 10.0 # Bonus to fitness for each burst activated
 BURST_SPEED_MULTIPLIER = 1.8 # e.g., 1.8x base speed
+
+# --- Turning Rate Constants ---
+DEFAULT_TURNING_RATE = 7.0  # Original fixed value as default
+MIN_TURNING_RATE = 10.0
+MAX_TURNING_RATE = 90.0
+TURNING_RATE_MUTATION_AMOUNT = 5.0 # How much turning rate can change during mutation
 
 
 # Neural Network Architecture Constants
@@ -50,20 +56,20 @@ DEFAULT_LOG_ENABLED = True
 LIVE_LOG_FILE_NAME = "evolution_live_log.csv"
 log_filepath = os.path.join(DEFAULT_LOG_DIRECTORY, LIVE_LOG_FILE_NAME)
 
-#  Obstacle Settings 
+#  Obstacle Settings
 OBSTACLE_PENALTY = 2       # Energy lost per collision with an obstacle
 OBSTACLE_SIZE = 25 # Size of square obstacles (if you use fixed size obstacles)
 NUM_OBSTACLES = 3 # Number of obstacles to generate
 OBSTACLE_COLOR = (100, 100, 150)
 
-#  Breeding and Fitness Metrics 
+#  Breeding and Fitness Metrics
 COLLISION_PENALTY_BREEDING = 1.0 # Points subtracted from fitness for each collision
 
-#  Spawn Safety 
+#  Spawn Safety
 MIN_SPAWN_DISTANCE_FROM_OBSTACLE = 25 # Minimum distance from obstacle edges for spawning
 
 
-#  Argument Parsing 
+#  Argument Parsing
 parser = argparse.ArgumentParser(description="Evolution Simulator (Pygame).")
 
 parser.add_argument('--width', type=int, default=DEFAULT_WIDTH, help=f"Window width (default: {DEFAULT_WIDTH})")
@@ -101,9 +107,14 @@ parser.add_argument('--food_limit_per_generation', type=int, default=DEFAULT_FOO
 parser.add_argument('--log_enabled', type=int, default=int(DEFAULT_LOG_ENABLED),
                     help=f"Enable logging (0=False, 1=True) (default: {int(DEFAULT_LOG_ENABLED)})")
 
+# --- NEW: Argument for default turning rate ---
+parser.add_argument('--turning_rate', type=float, default=DEFAULT_TURNING_RATE,
+                    help=f"Base turning rate for creatures (default: {DEFAULT_TURNING_RATE})")
+
+
 args = parser.parse_args()
 
-#  Assign values from parsed arguments to constants 
+#  Assign values from parsed arguments to constants
 WIDTH, HEIGHT = args.width, args.height
 FPS = args.fps
 
@@ -132,3 +143,6 @@ FOOD_LIMIT_PER_GENERATION = args.food_limit_per_generation
 
 LOG_DIRECTORY = DEFAULT_LOG_DIRECTORY
 LOG_ENABLED = bool(args.log_enabled)
+
+# --- NEW: Assign turning rate from arguments ---
+TURNING_RATE = args.turning_rate
