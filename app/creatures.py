@@ -6,7 +6,8 @@ from constants import (WIDTH, HEIGHT, WHITE, CREATURE_ENERGY_DECAY,
                        CREATURE_RADIUS, CREATURE_MAX_ENERGY,
                        NN_HIDDEN_NODES, NN_INPUT_NODES, NN_OUTPUT_NODES,
                        NN_MUTATION_AMOUNT, COLLISION_PENALTY_BREEDING, BURST_NN_THRESHOLD,
-                       BURST_NN_THRESHOLD, BURST_ENERGY_COST, BURST_DURATION_FRAMES, BURST_SPEED_MULTIPLIER,
+                       BURST_NN_THRESHOLD, MAX_BURSTS_PER_GENERATION, BURST_ENERGY_COST, 
+                       BURST_DURATION_FRAMES, BURST_SPEED_MULTIPLIER,
                        BURST_FITNESS_BONUS, FOOD_ENERGY_GAIN, FOOD_RADIUS, 
                        FOOD_COLOR, COLOR_MUTATION_AMOUNT, MUTATION_CHANCE,
                        MIN_SPAWN_DISTANCE_FROM_OBSTACLE, OBSTACLE_PENALTY, OBSTACLE_COLOR)
@@ -35,6 +36,9 @@ class Creature:
         self.burst_frames_left = 0
         self.bursts_activated_individual = 0 # Track individual bursts
         self.energy_spent_bursting_individual = 0 # Track individual energy spent on bursts
+        self.bursts_used_this_generation = 0
+        self.is_bursting = False # Ensure this is initialized
+        self.burst_timer = 0
 
 
         # Neural network initialization
@@ -174,12 +178,21 @@ class Creature:
 
         #  Speed Burst Logic 
         # If not currently bursting and NN output suggests burst and has enough energy
-        if not self.is_bursting and burst_decision_raw > BURST_NN_THRESHOLD and self.energy >= BURST_ENERGY_COST:
-            self.energy -= BURST_ENERGY_COST
-            self.is_bursting = True
-            self.burst_frames_left = BURST_DURATION_FRAMES
+        
+        # ... (inside Creature.move, where burst decision is made)
+        # (Removed erroneous burst_output usage; logic handled below with burst_decision_raw)
+        
+        if (not self.is_bursting and
+                burst_decision_raw > BURST_NN_THRESHOLD and
+                self.energy >= BURST_ENERGY_COST and
+                self.bursts_used_this_generation < MAX_BURSTS_PER_GENERATION): #
+            self.energy -= BURST_ENERGY_COST #
+            self.is_bursting = True #
+            self.burst_frames_left = BURST_DURATION_FRAMES #
             self.bursts_activated_individual += 1 # Increment individual burst count
             self.energy_spent_bursting_individual += BURST_ENERGY_COST # Track individual energy spent
+            self.bursts_used_this_generation += 1 # Increment the counter for this generation
+
 
         current_speed = self.speed
         if self.is_bursting:
