@@ -24,6 +24,7 @@ food_eaten_count = 0
 food_eaten_this_generation = 0
 current_generation = 0
 frame_count_this_generation = 0
+obstacles = []
 
 # --- NEW: Global counters for burst data per generation ---
 total_bursts_activated_gen = 0
