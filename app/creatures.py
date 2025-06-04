@@ -18,7 +18,7 @@ from nn import tanh
 class Creature:
     def __init__(self, x=None, y=None, color=None, energy=None,
                  nn_weights_ih=None, nn_biases_h=None, nn_weights_ho=None, nn_biases_o=None,
-                 obstacles_ref=None, turning_rate=None): # NEW: turning_rate parameter
+                 obstacles_ref=None, turning_rate=None):
         self.x = x if x is not None else random.randint(0, WIDTH)
         self.y = y if y is not None else random.randint(0, HEIGHT)
         self.radius = CREATURE_RADIUS
